@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Một mặt Rubik 3x3 nằm trong vùng an toàn (66dp) của adaptive icon -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:fillColor="#FFD60A" android:pathData="M31,31h14v14h-14z" />
+    <path android:fillColor="#D7263D" android:pathData="M47,31h14v14h-14z" />
+    <path android:fillColor="#1668DC" android:pathData="M63,31h14v14h-14z" />
+    <path android:fillColor="#12A150" android:pathData="M31,47h14v14h-14z" />
+    <path android:fillColor="#FFD60A" android:pathData="M47,47h14v14h-14z" />
+    <path android:fillColor="#FF7A1A" android:pathData="M63,47h14v14h-14z" />
+    <path android:fillColor="#F8F9FA" android:pathData="M31,63h14v14h-14z" />
+    <path android:fillColor="#1668DC" android:pathData="M47,63h14v14h-14z" />
+    <path android:fillColor="#12A150" android:pathData="M63,63h14v14h-14z" />
+</vector>
