@@ -12,6 +12,7 @@
     next: '<svg viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></svg>',
     back: '<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    camera: '<svg viewBox="0 0 24 24"><path d="M9 4l-1.6 2H4.5A2.5 2.5 0 0 0 2 8.500v9A2.500 2.500 0 0 0 4.500 20h15a2.500 2.500 0 0 0 2.500-2.500v-9A2.500 2.500 0 0 0 19.500 6h-2.900L15 4zm3 4.500a4.250 4.250 0 1 1 0 8.500 4.250 4.250 0 0 1 0-8.500zm0 2a2.250 2.250 0 1 0 0 4.500 2.250 2.250 0 0 0 0-4.500z"/></svg>',
     flip: '<svg viewBox="0 0 24 24"><path d="M12 3l4 5h-3v8h3l-4 5-4-5h3V8H8z"/></svg>'
   };
 
@@ -86,12 +87,13 @@
     var bNext = btn(ICON.next, 'Tiến một nước');
     wrap.appendChild(ctr);
 
-    var base = build({ mask: demo.mask, setup: demo.setup != null ? demo.setup : C.invert(demo.alg) });
+    var base = demo.state ? C.clone(demo.state)
+      : build({ mask: demo.mask, setup: demo.setup != null ? demo.setup : C.invert(demo.alg) });
     var state = C.clone(base), idx = 0, busy = false, playing = false;
     var yaw = demo.yaw == null ? -32 : demo.yaw, pitch = demo.pitch == null ? 26 : demo.pitch;
     var turn = null;
 
-    function draw() { C.drawCube(cv, state, { size: size, yaw: yaw, pitch: pitch, turn: turn }); }
+    function draw() { C.drawCube(cv, state, { size: size, yaw: yaw, pitch: pitch, turn: turn, colors: demo.colors }); }
 
     function refresh(active) {
       var now = active != null ? active : idx - 1;
@@ -255,6 +257,16 @@
     head.appendChild(el('p', 'muted', 'Phương pháp từng tầng cho người mới bắt đầu, có hình minh họa từng nước xoay.'));
     app.appendChild(head);
 
+    var scan = el('a', 'card step scan-entry');
+    scan.href = '#/giai';
+    scan.onclick = function () { fromHome = true; };
+    scan.appendChild(el('span', 'scan-icon', ICON.camera));
+    var st = el('div', 'step-text');
+    st.appendChild(el('div', 'step-title', 'Giải khối của tôi'));
+    st.appendChild(el('div', 'muted', 'Chụp 6 mặt khối Rubik của bạn, app chỉ từng nước xoay để giải.'));
+    scan.appendChild(st);
+    app.appendChild(scan);
+
     var prog = el('div', 'progress');
     prog.innerHTML = '<div class="progress-text"><span>Tiến độ</span><span>' + count + '/' + STEPS.length + ' bài</span></div>' +
       '<div class="bar"><i style="width:' + (count / STEPS.length * 100) + '%"></i></div>';
@@ -334,13 +346,16 @@
     app.appendChild(main);
   }
 
+  var cleanup = null; // dọn dẹp của trang hiện tại (ví dụ tắt camera)
   function route() {
     var myGen = ++gen;
     var id = location.hash.replace(/^#\/?/, '');
+    if (cleanup) { cleanup(); cleanup = null; }
     app.innerHTML = '';
     var idx = -1;
     STEPS.forEach(function (s, i) { if (s.id === id) idx = i; });
-    if (idx >= 0) renderStep(idx, myGen); else renderHome();
+    if (id === 'giai') cleanup = window.Scan.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen });
+    else if (idx >= 0) renderStep(idx, myGen); else renderHome();
     window.scrollTo(0, 0);
   }
 

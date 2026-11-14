@@ -134,6 +134,50 @@
     return true;
   }
 
+  /* ---------- Chuỗi 54 ô (thứ tự mặt U R F D L B) ----------
+     Mỗi mặt đọc theo hàng, từ trái sang phải, trên xuống dưới, khi nhìn thẳng vào mặt đó:
+     4 mặt bên giữ mặt U ở trên; mặt U nhìn với mặt B ở phía trên ảnh; mặt D nhìn với mặt F ở phía trên ảnh. */
+  var NET = 'URFDLB';
+  function faceletPos(face, r, c) {
+    switch (face) {
+      case 'U': return [c - 1, 1, r - 1];
+      case 'R': return [1, 1 - r, 1 - c];
+      case 'F': return [c - 1, 1 - r, 1];
+      case 'D': return [c - 1, -1, 1 - r];
+      case 'L': return [-1, 1 - r, c - 1];
+      default: return [1 - c, 1 - r, -1];
+    }
+  }
+
+  /* Mảng 54 giá trị màu của các ô */
+  function toFacelets(state) {
+    var out = [];
+    for (var f = 0; f < 6; f++) for (var r = 0; r < 3; r++) for (var c = 0; c < 3; c++) {
+      out.push(colorAt(state, faceletPos(NET[f], r, c), NET[f]));
+    }
+    return out;
+  }
+
+  /* Dựng khối từ 54 giá trị màu (khoá bất kỳ có trong bảng màu dùng để vẽ) */
+  function fromFacelets(cells) {
+    var map = {};
+    for (var f = 0; f < 6; f++) for (var r = 0; r < 3; r++) for (var c = 0; c < 3; c++) {
+      var p = faceletPos(NET[f], r, c), key = p.join(',');
+      (map[key] = map[key] || []).push({ n: FACE_N[NET[f]].slice(), c: cells[f * 9 + r * 3 + c] });
+    }
+    return Object.keys(map).map(function (key) {
+      var p = key.split(',').map(Number);
+      return { home: p, pos: p.slice(), st: map[key] };
+    });
+  }
+
+  /* Mỗi mặt chỉ còn một màu? */
+  function facesUniform(state) {
+    var cells = toFacelets(state);
+    for (var i = 0; i < 54; i++) if (cells[i] !== cells[((i / 9) | 0) * 9 + 4]) return false;
+    return true;
+  }
+
   /* ---------- Vẽ 3D ---------- */
 
   var AXES = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
@@ -207,7 +251,7 @@
         if (!col) continue;
         // đổ bóng nhẹ theo hướng mặt
         var light = Math.max(0, nv[0] * -0.25 + nv[1] * 0.55 + nv[2] * 0.8);
-        var shaded = shade(COLORS[col], 1 - 0.26 * (1 - light));
+        var shaded = shade((o.colors && o.colors[col]) || COLORS[col] || COLORS.X, 1 - 0.26 * (1 - light));
         poly(center, u, v, 0.36, it.moving);
         ctx.fillStyle = shaded; ctx.strokeStyle = shaded;
         ctx.lineWidth = scale * 0.12;
@@ -278,7 +322,8 @@
     FACE_N: FACE_N, COLORS: COLORS, solved: solved, clone: clone, parse: parse,
     applyMove: applyMove, apply: apply, invert: invert, repeat: repeat,
     colorAt: colorAt, isSolved: isSolved, drawCube: drawCube,
-    topView: topView, topPattern: topPattern
+    topView: topView, topPattern: topPattern,
+    toFacelets: toFacelets, fromFacelets: fromFacelets, facesUniform: facesUniform
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Cube = api;
