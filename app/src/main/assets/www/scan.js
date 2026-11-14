@@ -25,7 +25,28 @@
     return f;
   }
   // Giữ lại khi người dùng rời trang rồi quay lại
-  var S = { faces: emptyFaces(), step: 0, brush: 'W', result: null };
+  // auto: các ô do máy tự suy ra (khoá "F3"…); mode: 'lbl' = theo 8 bước bài học, 'short' = cách ngắn nhất
+  var S = { faces: emptyFaces(), step: 0, brush: 'W', result: null, auto: {}, clash: false, mode: 'lbl' };
+
+  /* Từ 4 mặt trở lên: tự điền những ô chỉ có đúng một khả năng. Tính lại từ đầu sau mỗi lần sửa. */
+  function autoFill() {
+    ORDER.forEach(function (f) {
+      S.faces[f].forEach(function (k, i) { if (S.auto[f + i]) S.faces[f][i] = null; });
+    });
+    S.auto = {};
+    S.clash = false;
+    var full = ORDER.filter(function (f) { return S.faces[f].every(function (k) { return k; }); }).length;
+    if (full < 4 || full === 6 || !window.Infer) return;
+    var cells = [], i;
+    for (i = 0; i < 6; i++) S.faces[NET[i]].forEach(function (k) { cells.push(k); });
+    var r = window.Infer.infer(cells, PALETTE.map(function (p) { return p.k; }));
+    if (!r) return;
+    if (!r.count) { S.clash = true; return; }
+    r.cells.forEach(function (k, n) {
+      var f = NET[n / 9 | 0], idx = n % 9;
+      if (k && !S.faces[f][idx]) { S.faces[f][idx] = k; S.auto[f + idx] = true; }
+    });
+  }
 
   function swatch(k) {
     return '<span class="sw" style="background:' + HEX[k] + '"></span><b>' + NAME[k] + '</b>';
@@ -78,7 +99,14 @@
     var cells = [], letters = '';
     for (i = 0; i < 6; i++) S.faces[NET[i]].forEach(function (k) { cells.push(k); letters += centre[k]; });
     var moves = window.Solver.solve(letters);
-    return { cells: cells, moves: moves };
+    var res = { cells: cells, moves: moves, lbl: null, start: null };
+    if (moves.length && window.Lbl) {
+      try {
+        res.start = window.Lbl.orient(C.fromFacelets(cells), 'Y');
+        res.lbl = window.Lbl.solve(res.start, function (k) { return NAME[k]; });
+      } catch (e) { res.lbl = null; } // vẫn còn cách ngắn nhất
+    }
+    return res;
   }
 
   /* ---------- Giao diện ---------- */
@@ -160,6 +188,7 @@
           b.type = 'button';
           b.onclick = function () {
             S.faces[ORDER[S.step]][idx] = S.brush;
+            delete S.auto[ORDER[S.step] + idx];
             update();
           };
           edit.appendChild(b);
@@ -196,6 +225,8 @@
         netFaces[f] = { btn: b, cells: cells };
       });
       main.appendChild(net);
+      var autoMsg = el('div', 'note tip');
+      main.appendChild(autoMsg);
 
       var err = el('div', 'note warn');
       err.style.display = 'none';
@@ -217,32 +248,50 @@
       function allFilled() { return ORDER.every(filled); }
 
       function update() {
-        var f = ORDER[S.step], last = S.step === ORDER.length - 1;
+        autoFill();
+        var f = ORDER[S.step], last = S.step === ORDER.length - 1, ready = allFilled();
         title.textContent = 'Mặt ' + (S.step + 1) + '/6';
         how.innerHTML = howTo(f);
         S.faces[f].forEach(function (k, idx) {
           editCells[idx].style.background = k ? HEX[k] : '';
-          editCells[idx].className = 'edit-cell' + (k ? '' : ' empty');
+          editCells[idx].className = 'edit-cell' + (k ? '' : ' empty') + (S.auto[f + idx] ? ' auto' : '');
         });
+        var nAuto = Object.keys(S.auto).length, missing = 0;
+        ORDER.forEach(function (ff) { S.faces[ff].forEach(function (k) { if (!k) missing++; }); });
+        autoMsg.style.display = S.clash || nAuto ? '' : 'none';
+        autoMsg.className = 'note ' + (S.clash ? 'warn' : 'tip');
+        if (S.clash) {
+          autoMsg.innerHTML = '<span class="note-tag">Có ô sai màu</span>Các mặt đã nhập đang mâu thuẫn nhau: không có khối Rubik nào ' +
+            'khớp với chúng. Hãy so lại từng mặt trong sơ đồ với khối thật (hay nhầm nhất là đỏ với cam, và mặt bị chụp lệch hướng).';
+        } else if (nAuto) {
+          autoMsg.innerHTML = '<span class="note-tag">Tự điền</span>Máy đã suy ra <b>' + nAuto + ' ô</b> (có chấm tròn) từ các mặt bạn nhập. ' +
+            (ready ? 'Đã đủ cả 54 ô nên <b>không cần chụp thêm</b>. Bạn nên liếc qua khối thật cho chắc rồi bấm “Tìm cách giải”.'
+              : 'Còn <b>' + missing + ' ô</b> chưa thể biết chắc, bạn hãy chụp hoặc tô nốt mặt còn thiếu.');
+        }
         PALETTE.forEach(function (p, idx) { palBtns[idx].className = 'pal' + (p.k === S.brush ? ' on' : ''); });
         ORDER.forEach(function (ff) {
           netFaces[ff].btn.className = 'net-face net-' + ff + (ff === f ? ' on' : '');
-          S.faces[ff].forEach(function (k, idx) { netFaces[ff].cells[idx].style.background = k ? HEX[k] : ''; });
+          S.faces[ff].forEach(function (k, idx) {
+            netFaces[ff].cells[idx].style.background = k ? HEX[k] : '';
+            netFaces[ff].cells[idx].className = S.auto[ff + idx] ? 'auto' : '';
+          });
         });
         prev.style.visibility = S.step === 0 ? 'hidden' : '';
-        next.textContent = last ? 'Tìm cách giải' : 'Mặt tiếp ›';
-        next.disabled = last ? !allFilled() : !filled(f);
+        next.textContent = last || ready ? 'Tìm cách giải' : 'Mặt tiếp ›';
+        next.disabled = last || ready ? !ready : !filled(f);
       }
 
       shoot.onclick = function () {
         if (!live) return;
-        S.faces[ORDER[S.step]] = live.slice();
+        var sf = ORDER[S.step];
+        for (var n = 0; n < 9; n++) delete S.auto[sf + n];
+        S.faces[sf] = live.slice();
         err.style.display = 'none';
         update();
       };
       prev.onclick = function () { if (S.step > 0) { S.step--; update(); window.scrollTo(0, 0); } };
       next.onclick = function () {
-        if (S.step < ORDER.length - 1) { S.step++; update(); window.scrollTo(0, 0); return; }
+        if (S.step < ORDER.length - 1 && !allFilled()) { S.step++; update(); window.scrollTo(0, 0); return; }
         err.style.display = 'none';
         next.disabled = true;
         next.textContent = 'Đang tính…';
@@ -266,7 +315,7 @@
         }, 30);
       };
       clear.onclick = function () {
-        S.faces = emptyFaces(); S.step = 0;
+        S.faces = emptyFaces(); S.step = 0; S.auto = {};
         err.style.display = 'none';
         update(); window.scrollTo(0, 0);
       };
@@ -331,7 +380,7 @@
         b.type = 'button';
         b.onclick = function () {
           S.result = null;
-          if (!keep) { S.faces = emptyFaces(); S.step = 0; }
+          if (!keep) { S.faces = emptyFaces(); S.step = 0; S.auto = {}; }
           renderScan();
           window.scrollTo(0, 0);
         };
@@ -341,8 +390,70 @@
       if (!res.moves.length) {
         main.appendChild(el('h1', null, 'Khối đã giải xong rồi'));
         main.appendChild(el('p', null, 'Cả sáu mặt bạn nhập đều đã đồng màu, không cần xoay thêm nước nào.'));
+      } else if (res.lbl) {
+        main.appendChild(el('h1', null, 'Lời giải cho khối của bạn'));
+        var tabs = el('div', 'mode-tabs');
+        [['lbl', 'Theo 8 bước bài học', res.lbl.total], ['short', 'Cách ngắn nhất', res.moves.length]].forEach(function (t) {
+          var b = el('button', S.mode === t[0] ? 'on' : '', t[1] + '<small>' + t[2] + ' nước</small>');
+          b.type = 'button';
+          b.onclick = function () {
+            if (S.mode === t[0]) return;
+            window.Speech.stop();
+            S.mode = t[0];
+            renderResult();
+          };
+          tabs.appendChild(b);
+        });
+        main.appendChild(tabs);
+        if (S.mode === 'lbl') lessonView(); else shortView();
       } else {
         main.appendChild(el('h1', null, 'Lời giải: ' + res.moves.length + ' nước xoay'));
+        shortView();
+      }
+      var nav = el('div', 'nav');
+      nav.appendChild(again('‹ Sửa lại màu', true));
+      nav.appendChild(again('Quét khối khác', false));
+      main.appendChild(nav);
+
+      /* Lời giải đi đúng 8 bước của bài học, mỗi bước một trình phát có ghi chú */
+      function lessonView() {
+        var st0 = res.start, top = C.colorAt(st0, C.FACE_N.U, 'U'), bot = C.colorAt(st0, C.FACE_N.D, 'D');
+        var front = C.colorAt(st0, C.FACE_N.F, 'F');
+        var hold = el('div', 'goal card');
+        var cv = el('canvas', 'cube');
+        cv.style.width = cv.style.height = '120px';
+        C.drawCube(cv, st0, { size: 120, colors: HEX });
+        hold.appendChild(cv);
+        hold.appendChild(el('div', 'hold-text', '<span class="note-tag">Cách cầm khối</span>Tâm ' + swatch(top) +
+          ' ở trên, tâm ' + swatch(bot) + ' ở dưới, tâm ' + swatch(front) + ' hướng về phía bạn. ' +
+          'Tâm ' + NAME[top] + ' luôn ở trên cho tới khi xong.'));
+        main.appendChild(hold);
+        main.appendChild(el('p', 'muted', 'Lời giải đi đúng 8 bước trong bài học, nên dài hơn cách ngắn nhất nhưng bước nào bạn cũng hiểu vì sao. ' +
+          'Mỗi bước chia thành từng <b>việc</b> có ghi chú; làm xong bước nào thì kéo xuống bước kế. ' +
+          'Khi gặp ký hiệu <b>y</b>, bạn xoay cả khối sang mặt khác (không xoay tầng nào).'));
+        res.lbl.steps.forEach(function (st, n) {
+          var info = null;
+          (window.STEPS || []).forEach(function (x) { if (x.id === st.id) info = x; });
+          var sec = el('section', 'lbl-step');
+          var head = el('div', 'lbl-head');
+          head.appendChild(el('div', 'step-num', 'Bước ' + (n + 1) + ' · ' + (st.count ? st.count + ' nước' : 'đã xong sẵn')));
+          head.appendChild(el('h2', null, info ? info.title : st.id));
+          var link = el('a', 'inline-link', 'Xem lại bài học');
+          link.href = '#/' + st.id;
+          head.appendChild(link);
+          sec.appendChild(head);
+          if (st.count) {
+            sec.appendChild(h.player({ segments: st.segs, state: st.start, colors: HEX }, h.gen));
+          } else {
+            sec.appendChild(el('div', 'note tip', '<span class="note-tag">May mắn</span>Trên khối của bạn bước này đã đúng sẵn, bỏ qua và làm bước kế tiếp.'));
+          }
+          main.appendChild(sec);
+        });
+        main.appendChild(el('div', 'note tip', '<span class="note-tag">Mẹo</span>Nếu xoay nhầm, bấm ◀ để lùi lại. ' +
+          'Hình ở mỗi bước bắt đầu đúng từ trạng thái sau khi xong bước trước, nên bạn có thể so với khối thật để biết mình có lệch không.'));
+      }
+
+      function shortView() {
         var hold = el('div', 'goal card');
         var cv = el('canvas', 'cube');
         cv.style.width = cv.style.height = '120px';
@@ -361,10 +472,6 @@
         main.appendChild(el('div', 'note tip', '<span class="note-tag">Mẹo</span>Nếu xoay nhầm, bấm ◀ để xem lại nước trước. ' +
           'Chưa quen ký hiệu R, U, F…? Xem bài <a class="inline-link" href="#/lam-quen">Làm quen</a>.'));
       }
-      var nav = el('div', 'nav');
-      nav.appendChild(again('‹ Sửa lại màu', true));
-      nav.appendChild(again('Quét khối khác', false));
-      main.appendChild(nav);
     }
   }
 

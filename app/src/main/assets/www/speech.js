@@ -99,6 +99,7 @@
   }
   /* "R'" + "Mặt phải: kéo xuống" → "rờ phẩy. Mặt phải, kéo xuống" */
   function move(label, desc) {
+    if (/^[xyz]/.test(label)) return String(desc).replace(':', ',');
     return moveName(label) + '. ' + String(desc).replace(/\s*\(180°\)/, '').replace(':', ',');
   }
 

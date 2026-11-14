@@ -124,12 +124,24 @@
     stage.appendChild(voiceButton());
     wrap.appendChild(stage);
 
+    // demo.segments = [{note, alg}]: công thức chia thành từng việc, mỗi việc có lời ghi chú riêng
+    var segs = demo.segments, segOf = [], segStart = {}, noteBox = null;
+    if (segs) {
+      segs.forEach(function (s, n) {
+        segStart[segOf.length] = true;
+        C.parse(s.alg).forEach(function () { segOf.push(n); });
+      });
+      noteBox = el('div', 'seg-note');
+      wrap.appendChild(noteBox);
+    }
+
     var caption = el('div', 'caption');
     wrap.appendChild(caption);
 
-    var moves = C.parse(demo.alg);
+    var moves = C.parse(segs ? segs.map(function (s) { return s.alg; }).join(' ') : demo.alg);
     var chips = el('div', 'chips');
-    var chipEls = moves.map(function (m) {
+    var chipEls = moves.map(function (m, i) {
+      if (segs && segStart[i] && i) chips.appendChild(el('span', 'chip-gap'));
       var c = el('span', 'chip', m.label.replace("'", '′'));
       chips.appendChild(c);
       return c;
@@ -163,6 +175,10 @@
       chipEls.forEach(function (c, i) {
         c.className = 'chip' + (i === now ? ' now' : (i < now ? ' done' : ''));
       });
+      if (segs && moves.length) {
+        var sn = segOf[active != null ? active : Math.min(idx, moves.length - 1)];
+        noteBox.innerHTML = '<span class="note-tag">Việc ' + (sn + 1) + '/' + segs.length + '</span>' + segs[sn].note;
+      }
       if (now < 0) caption.textContent = 'Bấm ▶ để xem từng nước xoay';
       else caption.innerHTML = '<b>' + moves[now].label.replace("'", '′') + '</b> · ' + describe(moves[now].label) +
         (idx >= moves.length && active == null ? ' <span class="ok">✓ Xong</span>' : '');
@@ -190,10 +206,11 @@
 
     // Lời đọc của nước đang xoay: khi tự chạy, chờ đọc xong mới sang nước kế
     var talk = null;
-    function speakMove(label) {
+    function speakMove(label, intro) {
       if (!Sp.isOn() || Sp.problem()) { talk = null; return; }
       var t = talk = { over: false, then: null };
-      Sp.say(Sp.move(label, describe(label)), function () {
+      var text = Sp.move(label, describe(label));
+      Sp.say(intro ? [Sp.plain(intro), text] : text, function () {
         t.over = true;
         if (t.then) { var f = t.then; t.then = null; f(); }
       });
@@ -205,7 +222,7 @@
     function forward(cb) {
       if (busy || idx >= moves.length) return;
       refresh(idx);
-      speakMove(moves[idx].label);
+      speakMove(moves[idx].label, segs && segStart[idx] ? segs[segOf[idx]].note : null);
       animate(moves[idx], 1, function () { idx++; refresh(); if (cb) cb(); });
     }
     function backward() {
@@ -221,7 +238,8 @@
     function loop() {
       if (!playing || myGen !== gen) return;
       if (idx >= moves.length) { playing = false; refresh(); return; }
-      forward(function () { afterTalk(function () { setTimeout(loop, 160); }); });
+      // sang việc mới thì dừng lâu hơn một chút để kịp đọc ghi chú
+      forward(function () { afterTalk(function () { setTimeout(loop, segs && segStart[idx] ? 1400 : 160); }); });
     }
 
     bPlay.onclick = function () {

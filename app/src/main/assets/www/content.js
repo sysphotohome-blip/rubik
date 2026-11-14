@@ -37,6 +37,9 @@
   };
   var FACE_NAME = { R: 'Mặt phải', L: 'Mặt trái', U: 'Mặt trên', D: 'Mặt dưới', F: 'Mặt trước', B: 'Mặt sau' };
   function describe(label) {
+    if (label === 'y') return 'Xoay cả khối một phần tư vòng: mặt bên phải ra phía trước, mặt trên vẫn ở trên';
+    if (label === "y'") return 'Xoay cả khối một phần tư vòng: mặt bên trái ra phía trước, mặt trên vẫn ở trên';
+    if (label === 'y2') return 'Xoay cả khối nửa vòng: mặt sau ra phía trước, mặt trên vẫn ở trên';
     if (label.slice(1) === '2') return FACE_NAME[label[0]] + ': xoay nửa vòng (180°)';
     return MOVE_DESC[label] || label;
   }
