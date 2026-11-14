@@ -430,7 +430,7 @@
         main.appendChild(hold);
         main.appendChild(el('p', 'muted', 'Lời giải đi đúng 8 bước trong bài học, nên dài hơn cách ngắn nhất nhưng bước nào bạn cũng hiểu vì sao. ' +
           'Mỗi bước chia thành từng <b>việc</b> có ghi chú; làm xong bước nào thì kéo xuống bước kế. ' +
-          'Khi gặp ký hiệu <b>y</b>, bạn xoay cả khối sang mặt khác (không xoay tầng nào).'));
+          'Khi gặp ký hiệu <b>y</b>, bạn xoay cả khối sang mặt khác (không xoay tầng nào, nên không tính vào số nước).'));
         res.lbl.steps.forEach(function (st, n) {
           var info = null;
           (window.STEPS || []).forEach(function (x) { if (x.id === st.id) info = x; });

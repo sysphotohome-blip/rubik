@@ -12,6 +12,8 @@
   var SUNE = "R U R' U R U2 R' U";
   var NIK = "U R U' L' U R' U' L";
   var TW = "R' D' R D";
+  var NIK_INV = "L' U R U' L U R' U'";
+  var TW_INV = "D' R' D R";
   var STEP_IDS = ['bong-cuc', 'chu-thap-trang', 'goc-trang', 'tang-hai', 'chu-thap-vang', 'canh-vang', 'dat-goc-vang', 'xoay-goc-vang'];
 
   function add(a, b, c) {
@@ -65,7 +67,8 @@
     function closeSeg() {
       if (seg && cur) {
         var a = simplify(seg.raw);
-        if (a) { cur.segs.push({ note: seg.note, alg: a }); cur.count += a.split(' ').length; }
+        // xoay cả khối (y) không làm khối thay đổi nên không tính vào số nước
+        if (a) { cur.segs.push({ note: seg.note, alg: a }); cur.count += a.split(' ').filter(function (t) { return t[0] !== 'y'; }).length; }
       }
       seg = null;
     }
@@ -173,6 +176,23 @@
       }
       return -1;
     }
+    // Ba cách thả góc (đang ở trước–phải–trên) xuống chỗ ngay bên dưới, tuỳ mặt trắng quay hướng nào.
+    // Kết quả giống hệt lặp R U R′ U′ 1, 5, 3 lần nhưng ngắn hơn nhiều.
+    var INS = [
+      ["R U R'", 'Mặt ' + nW + ' của góc quay sang phải: làm R U R′ (chính là R U R′ U′ bỏ nước cuối).'],
+      ["F' U' F", 'Mặt ' + nW + ' của góc quay về phía bạn: làm F′ U′ F (bản đối xứng của R U R′, thay cho 5 lần R U R′ U′).'],
+      ["R U2 R' U' R U R'", 'Mặt ' + nW + ' của góc ngửa lên trên: làm R U2 R′ U′ để mặt ' + nW + ' quay sang phải, rồi R U R′ (thay cho 3 lần R U R′ U′).']
+    ];
+    function crossOK() {
+      return SIDES.every(function (X) { return col(dEdge(X), 'D') === W && col(dEdge(X), X) === cen(X); });
+    }
+    function insertion() { // góc đang ở trước–phải–trên, chỗ của nó ở ngay dưới
+      var keep = [1, 2, 3].filter(slotDone);
+      for (var n = 0; n < INS.length; n++) {
+        if (after(INS[n][0], function () { return slotDone(0) && crossOK() && keep.every(slotDone); })) return INS[n];
+      }
+      return null;
+    }
     guard = 0;
     while (![0, 1, 2, 3].every(slotDone)) {
       if (guard++ > 30) throw new Error('lbl: góc trắng');
@@ -182,20 +202,24 @@
         if (cc.indexOf(W) < 0) continue;
         var j = slotFor(cc, W);
         if (j < 0) throw new Error('lbl: góc lạ');
-        if (!best || j === 0) best = { i: i, j: j, cols: cc.filter(function (x) { return x !== W; }) };
+        var pre = (turns('y', j) + ' ' + turns('U', i - j)).trim();
+        var ins = after(pre || "U U'", insertion);
+        var cost = (i === j ? 0 : 1) + (ins ? ins[0].split(' ').length : 99);
+        if (!best || cost < best.cost) best = { i: i, j: j, ins: ins, cost: cost, cols: cc.filter(function (x) { return x !== W; }) };
       }
       if (best) {
-        note('Góc ' + nW + '–' + name(best.cols[0]) + '–' + name(best.cols[1]) + ' đang ở tầng trên. Cầm khối để chỗ của nó (giữa tâm ' +
-          name(best.cols[0]) + ' và tâm ' + name(best.cols[1]) + ') nằm ở trước–phải, xoay U đưa góc tới ngay phía trên, rồi lặp R U R′ U′ tới khi góc vào đúng chỗ, mặt ' + nW + ' úp xuống.');
+        note('Góc ' + nW + '–' + name(best.cols[0]) + '–' + name(best.cols[1]) + ': cầm khối để chỗ của nó (giữa tâm ' +
+          name(best.cols[0]) + ' và tâm ' + name(best.cols[1]) + ') nằm ở trước–phải, xoay U đưa góc tới ngay phía trên chỗ đó. ' +
+          (best.ins ? best.ins[1] : 'Lặp R U R′ U′ tới khi góc vào đúng chỗ, mặt ' + nW + ' úp xuống.'));
         mv(turns('y', best.j));
         mv(turns('U', best.i - best.j));
-        k = 0;
-        while (!slotDone(0)) { if (k++ > 6) throw new Error('lbl: lặp góc'); mv(SEXY); }
+        if (best.ins) mv(best.ins[0]);
+        else { k = 0; while (!slotDone(0)) { if (k++ > 6) throw new Error('lbl: lặp góc'); mv(SEXY); } }
       } else {
         for (i = 0; i < 4; i++) if (!slotDone(i)) break;
-        note('Còn góc ' + nW + ' nằm ở tầng dưới nhưng sai chỗ hoặc sai hướng: cầm nó ở trước–phải–dưới, làm R U R′ U′ một lần để đưa nó lên tầng trên.');
+        note('Còn góc ' + nW + ' nằm ở tầng dưới nhưng sai chỗ hoặc sai hướng: cầm nó ở trước–phải–dưới, làm R U R′ để đưa nó lên tầng trên.');
         mv(turns('y', i));
-        mv(SEXY);
+        mv("R U R'");
       }
     }
 
@@ -303,6 +327,14 @@
         var q = pair(ok[0]);
         note('Góc ' + nY + '–' + name(cen(q[0])) + '–' + name(cen(q[1])) + ' đã đúng chỗ: cầm nó ở trước–phải–trên rồi làm công thức U R U′ L′ U R′ U′ L (3 góc còn lại đổi chỗ vòng tròn).');
         mv(turns('y', ok[0]));
+        // Nếu một lần chưa xong thì đáng lẽ phải làm 2 lần: thay bằng công thức đọc ngược, chỉ 1 lần
+        if (!after(NIK, function () { return [0, 1, 2, 3].every(inPlace); }) &&
+            after(NIK_INV, function () { return [0, 1, 2, 3].every(inPlace); })) {
+          seg.note = 'Góc ' + nY + '–' + name(cen(q[0])) + '–' + name(cen(q[1])) + ' đã đúng chỗ: cầm nó ở trước–phải–trên. ' +
+            '3 góc còn lại cần đổi chỗ theo chiều ngược, nên làm công thức đọc ngược L′ U R U′ L U R′ U′ một lần (thay cho 2 lần công thức xuôi).';
+          mv(NIK_INV);
+          continue;
+        }
       } else {
         note('Chưa có góc nào đúng chỗ: làm công thức U R U′ L′ U R′ U′ L một lần ở hướng bất kỳ, sau đó sẽ có một góc đúng chỗ.');
       }
@@ -323,7 +355,15 @@
       first = false;
       mv(turns('U', k));
       i = 0;
-      while (!yUp(0)) { if (i++ > 3) throw new Error('lbl: lặp xoay góc'); mv(TW + ' ' + TW); }
+      if (after(TW + ' ' + TW, function () { return yUp(0); })) {
+        seg.note += ' Góc này cần 2 lần.';
+        mv(TW + ' ' + TW);
+      } else {
+        // đáng lẽ 4 lần R′ D′ R D: làm công thức đọc ngược 2 lần cho kết quả y hệt
+        seg.note += ' Góc này đáng lẽ cần 4 lần: làm công thức đọc ngược D′ R′ D R 2 lần sẽ ra y hệt mà ngắn bằng nửa.';
+        mv(TW_INV + ' ' + TW_INV);
+        if (!yUp(0)) throw new Error('lbl: lặp xoay góc');
+      }
     }
     for (k = 0; k < 4; k++) if (after(turns('U', k) || "U U'", function () { return col(uEdge('F'), 'F') === cen('F'); })) break;
     if (k) { note('Xoay U để tầng trên khớp với các tầng dưới. Xong!'); mv(turns('U', k)); }
