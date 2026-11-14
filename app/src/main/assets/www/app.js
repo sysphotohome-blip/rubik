@@ -13,6 +13,9 @@
     back: '<svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     check: '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     camera: '<svg viewBox="0 0 24 24"><path d="M9 4l-1.6 2H4.5A2.5 2.5 0 0 0 2 8.500v9A2.500 2.500 0 0 0 4.500 20h15a2.500 2.500 0 0 0 2.500-2.500v-9A2.500 2.500 0 0 0 19.500 6h-2.900L15 4zm3 4.500a4.250 4.250 0 1 1 0 8.500 4.250 4.250 0 0 1 0-8.500zm0 2a2.250 2.250 0 1 0 0 4.500 2.250 2.250 0 0 0 0-4.500z"/></svg>',
+    sound: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8.500a5 5 0 0 1 0 7M18.500 6a8.500 8.500 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    mute: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.500 9.500l5 5M21.500 9.500l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
+    stop: '<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>',
     flip: '<svg viewBox="0 0 24 24"><path d="M12 3l4 5h-3v8h3l-4 5-4-5h3V8H8z"/></svg>'
   };
 
@@ -44,6 +47,65 @@
     try { localStorage.setItem('rubik.done', JSON.stringify(a)); } catch (e) { /* bỏ qua */ }
   }
 
+  /* ---------- Lời đọc ---------- */
+  var Sp = window.Speech, toastTimer = null;
+  function toast(msg) {
+    var t = document.querySelector('.toast') || document.body.appendChild(el('div', 'toast'));
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 6000);
+  }
+  /* Nút bật/tắt lời đọc từng nước xoay; mọi nút trên trang đổi theo cùng lúc */
+  function paintVoice() {
+    var on = Sp.isOn();
+    [].forEach.call(document.querySelectorAll('.voice'), function (b) {
+      b.innerHTML = on ? ICON.sound : ICON.mute;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-label', on ? 'Tắt lời đọc' : 'Bật lời đọc');
+    });
+  }
+  function voiceButton() {
+    var b = el('button', 'voice', Sp.isOn() ? ICON.sound : ICON.mute);
+    b.type = 'button';
+    b.classList.toggle('on', Sp.isOn());
+    b.setAttribute('aria-label', Sp.isOn() ? 'Tắt lời đọc' : 'Bật lời đọc');
+    b.onclick = function () {
+      var on = !Sp.isOn();
+      if (on && Sp.problem()) { toast(Sp.problem()); return; }
+      Sp.setOn(on);
+      paintVoice();
+      toast(on ? 'Đã bật lời đọc từng nước xoay' : 'Đã tắt lời đọc');
+    };
+    return b;
+  }
+  /* Nút "Nghe" đọc lần lượt danh sách câu; parts = [{text, node}] để tô sáng đoạn đang đọc */
+  function listenButton(getParts) {
+    var b = el('button', 'listen'), reading = false, lit = null;
+    b.type = 'button';
+    function paint() { b.innerHTML = (reading ? ICON.stop : ICON.sound) + '<span>' + (reading ? 'Dừng' : 'Nghe') + '</span>'; }
+    function unlight() { if (lit) lit.classList.remove('reading'); lit = null; }
+    b.onclick = function () {
+      if (reading) { Sp.stop(); return; }
+      if (Sp.problem()) { toast(Sp.problem()); return; }
+      var parts = getParts();
+      reading = true; paint();
+      Sp.say(parts.map(function (p) { return p.text; }), function () {
+        reading = false; unlight(); paint();
+      }, function (i) {
+        unlight();
+        lit = parts[i].node || null;
+        if (lit) {
+          lit.classList.add('reading');
+          var r = lit.getBoundingClientRect();
+          if (r.top < 70 || r.bottom > window.innerHeight - 20) window.scrollTo({ top: window.scrollY + r.top - 90, behavior: 'smooth' });
+        }
+      });
+    };
+    paint();
+    return b;
+  }
+
   /* ---------- Trình phát công thức ---------- */
   function player(demo, myGen) {
     var wrap = el('div', 'player card');
@@ -59,6 +121,7 @@
     flip.type = 'button';
     flip.setAttribute('aria-label', 'Đổi góc nhìn trên/dưới');
     stage.appendChild(flip);
+    stage.appendChild(voiceButton());
     wrap.appendChild(stage);
 
     var caption = el('div', 'caption');
@@ -125,27 +188,44 @@
       requestAnimationFrame(frame);
     }
 
+    // Lời đọc của nước đang xoay: khi tự chạy, chờ đọc xong mới sang nước kế
+    var talk = null;
+    function speakMove(label) {
+      if (!Sp.isOn() || Sp.problem()) { talk = null; return; }
+      var t = talk = { over: false, then: null };
+      Sp.say(Sp.move(label, describe(label)), function () {
+        t.over = true;
+        if (t.then) { var f = t.then; t.then = null; f(); }
+      });
+    }
+    function afterTalk(fn) {
+      if (talk && !talk.over) talk.then = fn; else fn();
+    }
+
     function forward(cb) {
       if (busy || idx >= moves.length) return;
       refresh(idx);
+      speakMove(moves[idx].label);
       animate(moves[idx], 1, function () { idx++; refresh(); if (cb) cb(); });
     }
     function backward() {
       if (busy || idx <= 0) return;
+      Sp.stop();
       animate(moves[idx - 1], -1, function () { idx--; refresh(); });
     }
     function reset() {
       if (busy) return;
+      Sp.stop();
       state = C.clone(base); idx = 0; draw(); refresh();
     }
     function loop() {
       if (!playing || myGen !== gen) return;
       if (idx >= moves.length) { playing = false; refresh(); return; }
-      forward(function () { setTimeout(loop, 160); });
+      forward(function () { afterTalk(function () { setTimeout(loop, 160); }); });
     }
 
     bPlay.onclick = function () {
-      if (playing) { playing = false; refresh(); return; }
+      if (playing) { playing = false; Sp.stop(); refresh(); return; }
       if (busy) return;
       if (idx >= moves.length) reset();
       playing = true; refresh(); loop();
@@ -309,17 +389,36 @@
     back.setAttribute('aria-label', 'Về danh sách');
     bar.appendChild(back);
     bar.appendChild(el('div', 'topbar-title', (i === 0 ? 'Mở đầu' : 'Bước ' + i + '/' + (STEPS.length - 1))));
+    var parts = []; // các đoạn sẽ đọc khi bấm "Nghe"
+    bar.appendChild(listenButton(function () { return parts; }));
     app.appendChild(bar);
 
     var main = el('main', 'lesson');
-    main.appendChild(el('h1', null, s.title));
+    var h1 = el('h1', null, s.title);
+    main.appendChild(h1);
+    parts.push({ text: (i === 0 ? '' : 'Bước ' + i + '. ') + s.title, node: h1 });
     if (i > 0) {
       var goal = el('div', 'goal card');
       goal.appendChild(cubeCanvas(build(s.goal), 150, s.goal));
       goal.appendChild(el('div', 'goal-text', '<span class="note-tag">Mục tiêu</span>' + s.short));
       main.appendChild(goal);
+      parts.push({ text: 'Mục tiêu: ' + Sp.plain(s.short), node: goal });
     }
-    s.blocks.forEach(function (b) { main.appendChild(renderBlock(b, myGen)); });
+    s.blocks.forEach(function (b) {
+      var node = main.appendChild(renderBlock(b, myGen)), text = '';
+      switch (b.type) {
+        case 'h': text = b.text; break;
+        case 'p': text = Sp.plain(b.html); break;
+        case 'tip': text = 'Mẹo: ' + Sp.plain(b.html); break;
+        case 'warn': text = 'Lưu ý: ' + Sp.plain(b.html); break;
+        case 'formula': text = 'Công thức: ' + Sp.alg(b.alg) + '. ' + (b.note ? Sp.plain(b.note) : ''); break;
+        case 'demo': text = Sp.plain((b.title || '') + '. ' + (b.text || '')); break;
+        case 'cubes': case 'tops':
+          text = b.items.map(function (it) { return it.caption ? Sp.plain(it.caption) : ''; }).filter(Boolean).join('. ');
+          break;
+      }
+      if (text) parts.push({ text: text, node: node });
+    });
 
     var mark = el('button', 'mark' + (done.indexOf(s.id) >= 0 ? ' on' : ''));
     mark.type = 'button';
@@ -351,10 +450,11 @@
     var myGen = ++gen;
     var id = location.hash.replace(/^#\/?/, '');
     if (cleanup) { cleanup(); cleanup = null; }
+    Sp.stop();
     app.innerHTML = '';
     var idx = -1;
     STEPS.forEach(function (s, i) { if (s.id === id) idx = i; });
-    if (id === 'giai') cleanup = window.Scan.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen });
+    if (id === 'giai') cleanup = window.Scan.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen, listenButton: listenButton });
     else if (idx >= 0) renderStep(idx, myGen); else renderHome();
     window.scrollTo(0, 0);
   }

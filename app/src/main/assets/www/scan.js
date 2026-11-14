@@ -100,8 +100,16 @@
     back.setAttribute('aria-label', 'Về danh sách');
     bar.appendChild(back);
     bar.appendChild(el('div', 'topbar-title', 'Giải khối của tôi'));
-    app.appendChild(bar);
     var main = el('main', 'lesson');
+    // "Nghe": đọc tiêu đề và lời hướng dẫn đang hiện (cách chụp mặt này, hoặc cách cầm khối)
+    bar.appendChild(h.listenButton(function () {
+      var nodes = main.querySelectorAll('h1, h1 + p, .hold-text'), parts = [];
+      [].forEach.call(nodes, function (n) {
+        parts.push({ text: window.Speech.plain(n.innerHTML).replace(/(\d)\/(\d)/, '$1 trên $2'), node: n });
+      });
+      return parts;
+    }));
+    app.appendChild(bar);
     app.appendChild(main);
 
     if (S.result) renderResult(); else renderScan();

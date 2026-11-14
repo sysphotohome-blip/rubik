@@ -21,6 +21,11 @@ import android.widget.FrameLayout;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.Locale;
+
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
+import android.webkit.JavascriptInterface;
 
 /** Vỏ ứng dụng: hiển thị nội dung hướng dẫn (HTML/JS trong assets/www) bằng WebView, chạy hoàn toàn offline. */
 public class MainActivity extends Activity {
@@ -34,6 +39,93 @@ public class MainActivity extends Activity {
 
     private WebView web;
     private PermissionRequest pendingCamera;
+
+    // Giọng đọc tiếng Việt của máy (dùng offline nếu máy đã có dữ liệu giọng nói)
+    private TextToSpeech tts;
+    private volatile String ttsStatus = "loading"; // loading | ready | nolang | error
+    private String waitingText;
+    private int waitingId;
+
+    /** Cầu nối cho speech.js: window.AndroidTTS */
+    private final class TtsBridge {
+        @JavascriptInterface
+        public String status() {
+            return ttsStatus;
+        }
+
+        @JavascriptInterface
+        public void speak(String text, int id) {
+            synchronized (MainActivity.this) {
+                if ("loading".equals(ttsStatus)) { // máy chưa khởi động xong bộ đọc: đọc ngay khi sẵn sàng
+                    waitingText = text;
+                    waitingId = id;
+                    return;
+                }
+            }
+            if ("ready".equals(ttsStatus)) {
+                tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, String.valueOf(id));
+            } else {
+                speechEnded(String.valueOf(id));
+            }
+        }
+
+        @JavascriptInterface
+        public void stop() {
+            synchronized (MainActivity.this) {
+                waitingText = null;
+            }
+            if ("ready".equals(ttsStatus)) tts.stop();
+        }
+    }
+
+    private void speechEnded(String utteranceId) {
+        final int id;
+        try {
+            id = Integer.parseInt(utteranceId);
+        } catch (NumberFormatException e) {
+            return;
+        }
+        runOnUiThread(() -> {
+            if (web != null) web.evaluateJavascript("window.Speech&&Speech._end(" + id + ")", null);
+        });
+    }
+
+    private void startTts() {
+        tts = new TextToSpeech(this, status -> {
+            String result = "error";
+            if (status == TextToSpeech.SUCCESS) {
+                int lang = tts.setLanguage(new Locale("vi", "VN"));
+                result = (lang == TextToSpeech.LANG_MISSING_DATA || lang == TextToSpeech.LANG_NOT_SUPPORTED)
+                        ? "nolang" : "ready";
+                tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                    @Override
+                    public void onStart(String utteranceId) { }
+
+                    @Override
+                    public void onDone(String utteranceId) {
+                        speechEnded(utteranceId);
+                    }
+
+                    @Override
+                    public void onError(String utteranceId) {
+                        speechEnded(utteranceId);
+                    }
+                });
+            }
+            String text;
+            int id;
+            synchronized (MainActivity.this) {
+                ttsStatus = result;
+                text = waitingText;
+                id = waitingId;
+                waitingText = null;
+            }
+            if (text != null) {
+                if ("ready".equals(result)) tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, String.valueOf(id));
+                else speechEnded(String.valueOf(id));
+            }
+        });
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -103,6 +195,9 @@ public class MainActivity extends Activity {
             }
         });
 
+        web.addJavascriptInterface(new TtsBridge(), "AndroidTTS");
+        startTts();
+
         root.addView(web, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         setContentView(root);
@@ -159,7 +254,14 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onPause() {
+        super.onPause();
+        if ("ready".equals(ttsStatus)) tts.stop(); // rời app thì ngừng đọc
+    }
+
+    @Override
     protected void onDestroy() {
+        if (tts != null) tts.shutdown();
         web.destroy();
         super.onDestroy();
     }
