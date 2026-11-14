@@ -21,8 +21,26 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Thông tin Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME" || true
+          ls "$ANDROID_HOME/platforms" || true
+
       - name: Build debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee build.log
+
+      # Đưa phần lỗi ra annotation để đọc được mà không cần mở log
+      - name: Tóm tắt lỗi build
+        if: failure()
+        run: |
+          {
+            echo "ANDROID_HOME=$ANDROID_HOME"
+            grep -n -E "error:|What went wrong|FAILURE|Caused by|ERROR|Could not" -A4 build.log | head -60
+          } | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g' > msg.txt
+          echo "::error title=Loi build::$(cat msg.txt)"
 
       - uses: actions/upload-artifact@v4
         with:
