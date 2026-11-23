@@ -1,0 +1,12 @@
+{
+  "name": "rubik-claude-sdk-bundle",
+  "private": true,
+  "description": "Dong goi SDK chinh thuc cua Anthropic thanh 1 file cho WebView (chi dung khi phat trien, CI khong chay npm).",
+  "scripts": {
+    "build": "esbuild entry.js --bundle --format=iife --platform=browser --target=es2019 --minify --legal-comments=eof --outfile=../../app/src/main/assets/www/vendor/anthropic.js"
+  },
+  "devDependencies": {
+    "@anthropic-ai/sdk": "^1.13.0",
+    "esbuild": "^0.28.2"
+  }
+}

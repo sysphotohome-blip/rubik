@@ -231,7 +231,10 @@
         'Khi gặp ký hiệu <b>y</b>, bạn xoay cả khối sang mặt khác, tâm vàng vẫn ở trên (không tính vào số nước).'));
       main.appendChild(hold);
 
-      var groups = [], segs = [], skipped = [];
+      var aiStatus = el('div', 'ai-status');
+      main.appendChild(aiStatus);
+
+      var groups = [], segs = [], skipped = [], metas = [];
       lbl.steps.forEach(function (st, n) {
         var info = null;
         (window.STEPS || []).forEach(function (x) { if (x.id === st.id) info = x; });
@@ -250,16 +253,74 @@
           speak: 'Bước ' + (n + 1) + '. ' + title + '. Mục tiêu: ' + g.goal + ' ' + g.why
         });
         skipped = [];
+        var meta = { id: st.id, no: n + 1, title: title, guide: g, group: groups[gi], html: groups[gi].html, segs: [] };
         st.segs.forEach(function (s, k) {
-          segs.push({ note: s.note, alg: s.alg, group: gi, tag: 'Việc ' + (k + 1) + '/' + st.segs.length });
+          var seg = { note: s.note, alg: s.alg, group: gi, tag: 'Việc ' + (k + 1) + '/' + st.segs.length, orig: s.note };
+          segs.push(seg);
+          meta.segs.push(seg);
         });
+        metas.push(meta);
       });
 
-      main.appendChild(h.player({
+      var playerEl = h.player({
         segments: segs, groups: groups, walk: true, state: G.start,
         startAt: G.at, onIndex: function (i) { G.at = i; },
         doneNote: '<span class="note-tag">Xong</span>Khối đã giải xong, cả 6 mặt đồng màu. Bạn có thể bấm lùi để xem lại, hoặc xáo trộn một khối mới để tập tiếp.'
-      }, h.gen));
+      }, h.gen);
+      main.appendChild(playerEl);
+
+      /* --- Lời giải thích do Claude soạn (nếu người dùng đã nhập khoá API) --- */
+      function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+      // Ghép lời của Claude vào bước lớn và từng việc; phần nào thiếu thì giữ lời có sẵn
+      function applyAi(m, d) {
+        if (d.intro) {
+          m.group.html = '<div class="ai-box"><span class="note-tag">Claude giải thích</span><p>' + esc(d.intro) + '</p></div>' + m.html;
+          m.group.speak = 'Bước ' + m.no + '. ' + m.title + '. ' + d.intro;
+        }
+        m.segs.forEach(function (seg, k) {
+          var t = d.tasks[k];
+          if (!t) return;
+          seg.say = t;
+          seg.note = esc(t) + '<small class="seg-orig">' + seg.orig + '</small>';
+        });
+      }
+      function setStatus(html, cls) {
+        aiStatus.className = 'ai-status' + (cls ? ' ' + cls : '');
+        aiStatus.innerHTML = html;
+      }
+      function here() { return !stopped && h.alive() && P.guide === G; }
+      function runAi() {
+        var todo = metas.filter(function (m) { return !G.ai[m.id]; });
+        function next() {
+          if (!here()) return;
+          var m = todo.shift();
+          if (!m) { setStatus('<b>Claude</b> đã soạn xong lời giải thích riêng cho khối này.', 'ok'); return; }
+          setStatus('<b>Claude</b> đang soạn lời giải thích cho bước ' + m.no + '… Bạn cứ bắt đầu, lời mới sẽ tự hiện ra.', 'busy');
+          window.AI.explain({
+            no: m.no, title: m.title, goal: m.guide.goal, why: m.guide.why,
+            tasks: m.segs.map(function (s) { return { note: window.Speech.plain(s.orig), alg: s.alg }; })
+          }).then(function (d) {
+            G.ai[m.id] = d;
+            if (!here()) return;
+            applyAi(m, d);
+            playerEl.refreshText();
+            next();
+          }, function (e) {
+            if (!here()) return;
+            setStatus(window.AI.explainError(e) + ' App đang dùng lời giải thích có sẵn. ', 'err');
+            var retry = el('button', 'link-btn', 'Thử lại');
+            retry.type = 'button';
+            retry.onclick = runAi;
+            aiStatus.appendChild(retry);
+          });
+        }
+        next();
+      }
+      G.ai = G.ai || {};
+      metas.forEach(function (m) { if (G.ai[m.id]) applyAi(m, G.ai[m.id]); });
+      playerEl.refreshText();
+      if (window.AI.hasKey()) runAi();
+      else setStatus('Muốn nghe giải thích dễ hiểu hơn, soạn riêng cho khối này? <a class="inline-link" href="#/tro-ly">Bật trợ lý Claude</a>');
 
       main.appendChild(el('div', 'note tip', '<span class="note-tag">Mẹo</span>Muốn làm theo trên khối thật, hãy xáo trộn khối thật đúng theo các nước đã ghi ở màn hình trước ' +
         '(bắt đầu từ khối đã giải, vàng ở trên, xanh lá phía trước). Nếu xoay nhầm, bấm ◀ để lùi lại.'));

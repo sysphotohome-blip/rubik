@@ -17,6 +17,7 @@
     mute: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.500 9.500l5 5M21.500 9.500l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
     stop: '<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>',
     cube: '<svg viewBox="0 0 24 24"><path d="M12 2.500l8.500 4.750v9.500L12 21.500l-8.500-4.750v-9.500z" fill="none" stroke="currentColor" stroke-width="1.800" stroke-linejoin="round"/><path d="M3.500 7.250L12 12l8.500-4.750M12 12v9.500" fill="none" stroke="currentColor" stroke-width="1.800" stroke-linejoin="round"/></svg>',
+    spark: '<svg viewBox="0 0 24 24"><path d="M12 2.500l2.200 6.300 6.300 2.200-6.300 2.200L12 19.500l-2.200-6.300L3.500 11l6.300-2.200zM19 16l.900 2.100L22 19l-2.100.900L19 22l-.900-2.100L16 19l2.100-.900z"/></svg>',
     flip: '<svg viewBox="0 0 24 24"><path d="M12 3l4 5h-3v8h3l-4 5-4-5h3V8H8z"/></svg>'
   };
 
@@ -258,7 +259,7 @@
       refresh(idx);
       var intro = null, sn = segOf[idx];
       if (segs && segStart[idx]) {
-        intro = [segs[sn].note];
+        intro = [segs[sn].say || segs[sn].note]; // say: lời do Claude soạn (nếu có)
         // sang bước lớn mới thì đọc lời giải thích của bước đó trước
         if (groups && (sn === 0 || segs[sn - 1].group !== segs[sn].group)) intro.unshift(groups[segs[sn].group].speak);
       }
@@ -306,6 +307,8 @@
     window.addEventListener('pointercancel', end);
 
     draw(); refresh();
+    // Gọi sau khi đổi nội dung của segments/groups (ví dụ lời Claude vừa về) để vẽ lại chữ
+    wrap.refreshText = function () { shownGroup = -1; if (!busy) refresh(); };
     return wrap;
   }
 
@@ -414,6 +417,17 @@
     pt.appendChild(el('div', 'muted', 'Tự xáo trộn khối trên màn hình, app hướng dẫn từng nước theo 8 bài học và giải thích vì sao.'));
     prac.appendChild(pt);
     app.appendChild(prac);
+
+    var ai = el('a', 'card step scan-entry ai-entry');
+    ai.href = '#/tro-ly';
+    ai.onclick = function () { fromHome = true; };
+    ai.appendChild(el('span', 'scan-icon', ICON.spark));
+    var at = el('div', 'step-text');
+    at.appendChild(el('div', 'step-title', 'Trợ lý Claude'));
+    at.appendChild(el('div', 'muted', window.AI.hasKey() ? 'Đang bật: Claude giải thích từng bước bằng lời dễ hiểu ở Khối 3D.'
+      : 'Nhập khoá API để Claude giải thích từng bước bằng lời dễ hiểu và đọc thành tiếng.'));
+    ai.appendChild(at);
+    app.appendChild(ai);
 
     var prog = el('div', 'progress');
     prog.innerHTML = '<div class="progress-text"><span>Tiến độ</span><span>' + count + '/' + STEPS.length + ' bài</span></div>' +
@@ -524,6 +538,7 @@
     STEPS.forEach(function (s, i) { if (s.id === id) idx = i; });
     if (id === 'khoi-3d') cleanup = window.Practice.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen, listenButton: listenButton, bigSize: bigSize, alive: function () { return myGen === gen; } });
     else if (id === 'giai') cleanup =window.Scan.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen, listenButton: listenButton });
+    else if (id === 'tro-ly') window.AI.renderSettings(app, { el: el, icons: ICON, goHome: goHome, alive: function () { return myGen === gen; } });
     else if (idx >= 0) renderStep(idx, myGen); else renderHome();
     window.scrollTo(0, 0);
   }

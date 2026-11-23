@@ -27,7 +27,7 @@ import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
 import android.webkit.JavascriptInterface;
 
-/** Vỏ ứng dụng: hiển thị nội dung hướng dẫn (HTML/JS trong assets/www) bằng WebView, chạy hoàn toàn offline. */
+/** Vỏ ứng dụng: hiển thị nội dung hướng dẫn (HTML/JS trong assets/www) bằng WebView. Mọi thứ chạy offline, trừ Trợ lý Claude (tuỳ chọn, cần mạng). */
 public class MainActivity extends Activity {
 
     // Nội dung được phục vụ từ assets/www qua một địa chỉ https nội bộ (không ra mạng):

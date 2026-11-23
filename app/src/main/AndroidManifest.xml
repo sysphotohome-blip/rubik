@@ -3,6 +3,8 @@
 
     <!-- Chỉ dùng để chụp các mặt khối Rubik; ảnh được xử lý ngay trên máy, không lưu và không gửi đi đâu -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Chỉ dùng khi người dùng tự bật Trợ lý Claude: gửi các nước xoay (không gửi ảnh) tới API của Anthropic -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <!-- Cho phép app tìm thấy bộ đọc văn bản của máy (cần từ Android 11) -->

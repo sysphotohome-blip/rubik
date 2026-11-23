@@ -287,3 +287,23 @@ button.nav-btn.primary { color: var(--on-accent); }
 }
 .nav-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .nav-btn.hidden { visibility: hidden; }
+
+/* ---------- Trợ lý Claude ---------- */
+.ai-entry { margin-top: 10px; }
+.ai-status { margin: 12px 0; font-size: 14px; color: var(--muted); }
+.ai-status.busy::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 8px; border-radius: 50%; background: var(--accent); animation: ai-pulse 1s ease-in-out infinite alternate; }
+.ai-status.err { color: var(--warn); }
+.ai-status .link-btn { display: inline; width: auto; margin: 0; padding: 0; }
+@keyframes ai-pulse { from { opacity: 0.25; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .ai-status.busy::before { animation: none; } }
+.ai-box { margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--accent-soft); }
+.ai-box .note-tag { color: var(--accent); }
+.ai-box p { margin: 0; }
+.seg-orig { display: block; margin-top: 6px; font-size: 13px; }
+.ai-form { padding: 16px; margin: 14px 0; }
+.ai-form label { display: block; font-weight: 700; margin: 12px 0 6px; }
+.ai-form input { width: 100%; box-sizing: border-box; padding: 12px; font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 12px; }
+.ai-row { display: flex; gap: 10px; margin-top: 12px; }
+.ai-row .big-btn { flex: 1; }
+.ai-state { font-size: 14px; color: var(--muted); }
+.ai-state.on { color: var(--ok); font-weight: 700; }
