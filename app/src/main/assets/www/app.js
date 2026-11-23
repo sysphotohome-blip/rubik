@@ -16,6 +16,7 @@
     sound: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 8.500a5 5 0 0 1 0 7M18.500 6a8.500 8.500 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
     mute: '<svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.500 9.500l5 5M21.500 9.500l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
     stop: '<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>',
+    cube: '<svg viewBox="0 0 24 24"><path d="M12 2.500l8.500 4.750v9.500L12 21.500l-8.500-4.750v-9.500z" fill="none" stroke="currentColor" stroke-width="1.800" stroke-linejoin="round"/><path d="M3.500 7.250L12 12l8.500-4.750M12 12v9.500" fill="none" stroke="currentColor" stroke-width="1.800" stroke-linejoin="round"/></svg>',
     flip: '<svg viewBox="0 0 24 24"><path d="M12 3l4 5h-3v8h3l-4 5-4-5h3V8H8z"/></svg>'
   };
 
@@ -35,6 +36,11 @@
     cv.style.width = cv.style.height = size + 'px';
     C.drawCube(cv, state, { size: size, yaw: view && view.yaw, pitch: view && view.pitch });
     return cv;
+  }
+
+  /* Cỡ hình lớn: kín bề ngang, nhưng chừa chỗ cho ghi chú và nút bấm bên dưới */
+  function bigSize() {
+    return Math.round(Math.max(220, Math.min(window.innerWidth, 560, window.innerHeight * 0.62)));
   }
 
   function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
@@ -112,8 +118,19 @@
     if (demo.title) wrap.appendChild(el('h3', null, demo.title));
     if (demo.text) wrap.appendChild(el('p', 'muted', demo.text));
 
-    var size = Math.max(200, Math.min(280, window.innerWidth - 72));
-    var stage = el('div', 'stage');
+    // demo.groups = [{line, html, speak}]: các bước lớn; mỗi segment thuộc một nhóm (segment.group)
+    var groups = demo.groups, groupLine = null, groupBox = null, barFill = null, shownGroup = -1;
+    if (groups) {
+      groupLine = el('div', 'walk-step');
+      wrap.appendChild(groupLine);
+      var pbar = el('div', 'bar', '<i></i>');
+      barFill = pbar.firstChild;
+      wrap.appendChild(pbar);
+    }
+
+    // Chế độ hướng dẫn từng nước: hình to gần kín bề ngang màn hình
+    var size = demo.walk ? bigSize() : Math.max(200, Math.min(280, window.innerWidth - 72));
+    var stage = el('div', demo.walk ? 'stage big' : 'stage');
     var cv = el('canvas', 'cube drag');
     cv.style.width = cv.style.height = size + 'px';
     stage.appendChild(cv);
@@ -141,7 +158,7 @@
     var moves = C.parse(segs ? segs.map(function (s) { return s.alg; }).join(' ') : demo.alg);
     var chips = el('div', 'chips');
     var chipEls = moves.map(function (m, i) {
-      if (segs && segStart[i] && i) chips.appendChild(el('span', 'chip-gap'));
+      if (segs && segStart[i] && i && !demo.walk) chips.appendChild(el('span', 'chip-gap'));
       var c = el('span', 'chip', m.label.replace("'", '′'));
       chips.appendChild(c);
       return c;
@@ -161,10 +178,18 @@
     var bPlay = btn(ICON.play, 'Chạy', 'primary');
     var bNext = btn(ICON.next, 'Tiến một nước');
     wrap.appendChild(ctr);
+    if (groups) {
+      groupBox = el('div', 'walk-info');
+      wrap.appendChild(groupBox);
+    }
 
     var base = demo.state ? C.clone(demo.state)
       : build({ mask: demo.mask, setup: demo.setup != null ? demo.setup : C.invert(demo.alg) });
     var state = C.clone(base), idx = 0, busy = false, playing = false;
+    if (demo.startAt) { // mở lại đúng chỗ đang xem dở
+      idx = Math.min(demo.startAt, moves.length);
+      for (var k0 = 0; k0 < idx; k0++) C.applyMove(state, moves[k0]);
+    }
     var yaw = demo.yaw == null ? -32 : demo.yaw, pitch = demo.pitch == null ? 26 : demo.pitch;
     var turn = null;
 
@@ -177,8 +202,17 @@
       });
       if (segs && moves.length) {
         var sn = segOf[active != null ? active : Math.min(idx, moves.length - 1)];
-        noteBox.innerHTML = '<span class="note-tag">Việc ' + (sn + 1) + '/' + segs.length + '</span>' + segs[sn].note;
+        var fin = idx >= moves.length && active == null;
+        noteBox.innerHTML = fin && demo.doneNote ? demo.doneNote
+          : '<span class="note-tag">' + (segs[sn].tag || 'Việc ' + (sn + 1) + '/' + segs.length) + '</span>' + segs[sn].note;
+        if (demo.walk) chipEls.forEach(function (c, i) { c.hidden = segOf[i] !== sn; });
+        if (groups) {
+          var g = segs[sn].group;
+          if (g !== shownGroup) { shownGroup = g; groupLine.innerHTML = groups[g].line; groupBox.innerHTML = groups[g].html; }
+          barFill.style.width = ((active != null ? active : idx) / moves.length * 100) + '%';
+        }
       }
+      if (demo.onIndex && active == null) demo.onIndex(idx);
       if (now < 0) caption.textContent = 'Bấm ▶ để xem từng nước xoay';
       else caption.innerHTML = '<b>' + moves[now].label.replace("'", '′') + '</b> · ' + describe(moves[now].label) +
         (idx >= moves.length && active == null ? ' <span class="ok">✓ Xong</span>' : '');
@@ -210,7 +244,7 @@
       if (!Sp.isOn() || Sp.problem()) { talk = null; return; }
       var t = talk = { over: false, then: null };
       var text = Sp.move(label, describe(label));
-      Sp.say(intro ? [Sp.plain(intro), text] : text, function () {
+      Sp.say(intro ? intro.map(Sp.plain).concat(text) : text, function () {
         t.over = true;
         if (t.then) { var f = t.then; t.then = null; f(); }
       });
@@ -222,7 +256,13 @@
     function forward(cb) {
       if (busy || idx >= moves.length) return;
       refresh(idx);
-      speakMove(moves[idx].label, segs && segStart[idx] ? segs[segOf[idx]].note : null);
+      var intro = null, sn = segOf[idx];
+      if (segs && segStart[idx]) {
+        intro = [segs[sn].note];
+        // sang bước lớn mới thì đọc lời giải thích của bước đó trước
+        if (groups && (sn === 0 || segs[sn - 1].group !== segs[sn].group)) intro.unshift(groups[segs[sn].group].speak);
+      }
+      speakMove(moves[idx].label, intro);
       animate(moves[idx], 1, function () { idx++; refresh(); if (cb) cb(); });
     }
     function backward() {
@@ -365,6 +405,16 @@
     scan.appendChild(st);
     app.appendChild(scan);
 
+    var prac = el('a', 'card step scan-entry prac-entry');
+    prac.href = '#/khoi-3d';
+    prac.onclick = function () { fromHome = true; };
+    prac.appendChild(el('span', 'scan-icon', ICON.cube));
+    var pt = el('div', 'step-text');
+    pt.appendChild(el('div', 'step-title', 'Khối 3D để tập giải'));
+    pt.appendChild(el('div', 'muted', 'Tự xáo trộn khối trên màn hình, app hướng dẫn từng nước theo 8 bài học và giải thích vì sao.'));
+    prac.appendChild(pt);
+    app.appendChild(prac);
+
     var prog = el('div', 'progress');
     prog.innerHTML = '<div class="progress-text"><span>Tiến độ</span><span>' + count + '/' + STEPS.length + ' bài</span></div>' +
       '<div class="bar"><i style="width:' + (count / STEPS.length * 100) + '%"></i></div>';
@@ -472,7 +522,8 @@
     app.innerHTML = '';
     var idx = -1;
     STEPS.forEach(function (s, i) { if (s.id === id) idx = i; });
-    if (id === 'giai') cleanup = window.Scan.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen, listenButton: listenButton });
+    if (id === 'khoi-3d') cleanup = window.Practice.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen, listenButton: listenButton, bigSize: bigSize, alive: function () { return myGen === gen; } });
+    else if (id === 'giai') cleanup =window.Scan.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen, listenButton: listenButton });
     else if (idx >= 0) renderStep(idx, myGen); else renderHome();
     window.scrollTo(0, 0);
   }

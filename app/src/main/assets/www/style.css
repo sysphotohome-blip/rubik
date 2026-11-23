@@ -250,6 +250,27 @@ button.nav-btn.primary { color: var(--on-accent); }
 .seg-note .note-tag { color: var(--accent); }
 .chip-gap { flex-basis: 100%; height: 0; }
 
+/* Khối 3D để tập giải */
+.prac-entry { margin-top: 10px; }
+/* Hình to kín bề ngang: tràn qua lề của thẻ (14 + viền 1) và lề trang (16) */
+.stage.big { margin-left: -31px; margin-right: -31px; border-radius: 0; }
+.pad { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 12px 0 4px; }
+.pad button {
+  padding: 10px 0; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text);
+  font: 700 17px/1.2 ui-monospace, "Roboto Mono", Menlo, Consolas, monospace;
+}
+.pad button:active { background: var(--stage); transform: scale(0.95); }
+.hist { margin: 10px 0 14px; padding: 10px 12px; border-radius: 12px; background: var(--stage); font-size: 14.5px; line-height: 1.5; word-spacing: 3px; }
+.hist b { font-family: ui-monospace, "Roboto Mono", Menlo, Consolas, monospace; }
+.prac-actions { display: grid; gap: 10px; margin-top: 6px; }
+.walk-step { margin: 0 0 8px; font-size: 15.5px; line-height: 1.4; }
+.walk-step .inline-link { font-size: 14px; white-space: nowrap; }
+.walk-step + .bar { height: 5px; }
+.walk-info { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 15px; line-height: 1.5; }
+.walk-info h3 { margin: 0 0 6px; }
+.walk-info p { margin: 8px 0; }
+.walk-info .note { margin: 0 0 10px; }
+
 /* Cuối bài */
 .mark {
   width: 100%; margin-top: 24px; padding: 13px; border-radius: 14px;
