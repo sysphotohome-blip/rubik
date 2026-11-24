@@ -307,3 +307,16 @@ button.nav-btn.primary { color: var(--on-accent); }
 .ai-row .big-btn { flex: 1; }
 .ai-state { font-size: 14px; color: var(--muted); }
 .ai-state.on { color: var(--ok); font-weight: 700; }
+
+/* Ô trò chuyện với Claude, ghim ở đáy màn hình Khối 3D */
+.has-dock { padding-bottom: 96px; }
+.chat-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; max-width: 560px; margin: 0 auto; padding: 8px 12px calc(10px + env(safe-area-inset-bottom)); background: var(--bg); border-top: 1px solid var(--line); }
+.chat-row { display: flex; gap: 8px; }
+.chat-row input { flex: 1; min-width: 0; padding: 12px 14px; font: inherit; color: inherit; background: var(--card); border: 1px solid var(--line); border-radius: 22px; }
+.chat-send { flex: none; padding: 0 18px; border: 0; border-radius: 22px; background: var(--accent); color: var(--on-accent); font: inherit; font-weight: 700; }
+.chat-send:disabled { opacity: 0.4; }
+.chat-bubble { position: relative; margin-bottom: 8px; padding: 10px 36px 10px 12px; border-radius: 14px; background: var(--accent-soft); font-size: 15px; line-height: 1.45; max-height: 30vh; overflow-y: auto; }
+.chat-asked { font-size: 13px; color: var(--muted); margin-bottom: 2px; }
+.chat-answer.busy { color: var(--muted); }
+.chat-answer.err { color: var(--warn); }
+.chat-close { position: absolute; top: 2px; right: 4px; width: 32px; height: 32px; border: 0; background: none; color: var(--muted); font-size: 22px; line-height: 1; }

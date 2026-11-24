@@ -309,6 +309,35 @@
     draw(); refresh();
     // Gọi sau khi đổi nội dung của segments/groups (ví dụ lời Claude vừa về) để vẽ lại chữ
     wrap.refreshText = function () { shownGroup = -1; if (!busy) refresh(); };
+
+    /* Lệnh điều khiển từ bên ngoài (trợ lý Claude dùng) */
+    function seek(i) { // nhảy thẳng tới sau nước thứ i, không chạy hình
+      if (busy) return false;
+      playing = false; Sp.stop();
+      idx = Math.max(0, Math.min(moves.length, i));
+      state = C.clone(base);
+      for (var k = 0; k < idx; k++) C.applyMove(state, moves[k]);
+      draw(); refresh();
+      return true;
+    }
+    wrap.ctl = {
+      info: function () {
+        return { idx: idx, total: moves.length, busy: busy, playing: playing,
+          seg: segs && moves.length ? segOf[Math.min(idx, moves.length - 1)] : -1 };
+      },
+      seek: seek,
+      segIndex: function (sn) { return segOf.indexOf(sn); }, // nước đầu tiên của việc thứ sn
+      step: function (n, done) { // xoay tiến n nước, có hình và lời đọc
+        if (busy) { done(false); return; }
+        playing = false;
+        (function go(k) {
+          if (k <= 0 || idx >= moves.length) { done(true); return; }
+          forward(function () { afterTalk(function () { go(k - 1); }); });
+        })(n);
+      },
+      play: function () { if (!playing) bPlay.onclick(); },
+      pause: function () { if (playing) bPlay.onclick(); }
+    };
     return wrap;
   }
 
@@ -536,7 +565,7 @@
     app.innerHTML = '';
     var idx = -1;
     STEPS.forEach(function (s, i) { if (s.id === id) idx = i; });
-    if (id === 'khoi-3d') cleanup = window.Practice.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen, listenButton: listenButton, bigSize: bigSize, alive: function () { return myGen === gen; } });
+    if (id === 'khoi-3d') cleanup = window.Practice.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen, listenButton: listenButton, bigSize: bigSize, paintVoice: paintVoice, alive: function () { return myGen === gen; } });
     else if (id === 'giai') cleanup =window.Scan.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen, listenButton: listenButton });
     else if (id === 'tro-ly') window.AI.renderSettings(app, { el: el, icons: ICON, goHome: goHome, alive: function () { return myGen === gen; } });
     else if (idx >= 0) renderStep(idx, myGen); else renderHome();

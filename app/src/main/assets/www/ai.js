@@ -102,6 +102,7 @@
       lines.push((i + 1) + '. Ghi chú của app: ' + t.note + ' | Các nước xoay: ' + t.alg);
     });
     lines.push('', 'Hãy viết intro và đúng ' + step.tasks.length + ' phần tử trong tasks.');
+    if (getStyle()) lines.push('', 'Người học dặn riêng về cách giải thích, hãy làm theo: ' + getStyle());
 
     return client().then(function (c) {
       return c.beta.messages.create({
@@ -126,6 +127,105 @@
         intro: data.intro.trim(),
         tasks: data.tasks.map(function (t) { return typeof t === 'string' ? t.trim() : ''; })
       };
+    });
+  }
+
+  /* Cách giải thích do người học dặn (qua ô trò chuyện), nhớ lại cho các lần sau */
+  var STYLE = 'rubik.aiStyle';
+  function getStyle() {
+    try { return localStorage.getItem(STYLE) || ''; } catch (e) { return ''; }
+  }
+  function setStyle(s) {
+    try { if (s) localStorage.setItem(STYLE, s); else localStorage.removeItem(STYLE); } catch (e) { /* bỏ qua */ }
+  }
+
+  /* ---------- Trò chuyện, có công cụ để điều khiển khối ---------- */
+  var CHAT_SYSTEM = [
+    'Bạn là trợ lý trong một app Android dạy giải Rubik 3×3 theo phương pháp từng tầng (8 bước). Người dùng đang ở màn hình "Khối 3D để tập giải" và nói chuyện với bạn để điều khiển khối trên màn hình và cách hướng dẫn giải.',
+    '',
+    'Màn hình có hai chế độ. Chế độ khối: người dùng tự xoay hoặc xáo trộn khối. Chế độ hướng dẫn: app đã tính sẵn lời giải cho khối đó và chạy từng nước, chia theo 8 bước bài học, mỗi bước gồm vài việc.',
+    'Đầu mỗi tin nhắn của người dùng có phần [Trạng thái app] do app tự chèn, cho biết đang ở chế độ nào và đang tới đâu. Người dùng không nhìn thấy phần đó.',
+    '',
+    'Cách làm việc:',
+    '- Khi người dùng muốn làm gì đó với khối hay với phần hướng dẫn, hãy gọi công cụ để làm ngay, đừng chỉ mô tả. Có thể gọi nhiều công cụ nối tiếp nhau.',
+    '- Lời giải do app tính. Bạn không tự nghĩ ra dãy nước để giải khối; muốn giải thì mở hướng dẫn (start_guide).',
+    '- Nếu công cụ báo lỗi vì đang ở sai chế độ, hãy chuyển chế độ bằng công cụ phù hợp rồi làm lại.',
+    '- Khi người dùng muốn đổi cách giải thích (ngắn hơn, kỹ hơn, cho trẻ nhỏ, giọng vui hơn…), gọi set_explain_style.',
+    '- Khi người dùng hỏi về Rubik hoặc về bước đang làm, hãy trả lời dựa trên trạng thái app và kiến thức về phương pháp từng tầng.',
+    '',
+    'Ký hiệu xoay dùng trong công cụ: R, L, U, D, F, B là mặt phải, trái, trên, dưới, trước, sau, xoay một phần tư vòng theo chiều kim đồng hồ khi nhìn thẳng vào mặt đó; thêm dấu \' là xoay ngược chiều kim đồng hồ; thêm số 2 là nửa vòng. Tâm vàng ở trên, trắng ở dưới, xanh lá phía trước, cam bên phải, đỏ bên trái, xanh dương phía sau.',
+    '',
+    'Cách trả lời: tiếng Việt, một đến ba câu ngắn, lời lẽ đời thường. Câu trả lời được giọng máy đọc thành tiếng nên chỉ dùng chữ thường: không markdown, không gạch đầu dòng, không emoji, và gọi mặt bằng tên thay vì ký hiệu.'
+  ].join('\n');
+
+  function tool(name, description, props, required) {
+    return { name: name, description: description, input_schema: { type: 'object', properties: props || {}, required: required || [] } };
+  }
+  var TOOLS = [
+    tool('turn_faces', 'Chế độ khối: xoay các mặt của khối trên màn hình theo thứ tự. Dùng khi người dùng bảo xoay mặt nào đó.',
+      { moves: { type: 'string', description: 'Các nước xoay cách nhau bằng dấu cách, ví dụ: R U\' F2. Tối đa 40 nước.' } }, ['moves']),
+    tool('scramble', 'Chế độ khối: xáo trộn khối ngẫu nhiên 20 nước.'),
+    tool('reset_cube', 'Chế độ khối: đặt khối về trạng thái đã giải xong.'),
+    tool('start_guide', 'Chế độ khối: tính lời giải cho khối đang có và mở chế độ hướng dẫn từng nước. Khối phải đang rối.'),
+    tool('back_to_cube', 'Chế độ hướng dẫn: thoát hướng dẫn, quay về chế độ khối, giữ nguyên khối đang giải dở lúc bắt đầu hướng dẫn.'),
+    tool('guide_step', 'Chế độ hướng dẫn: tiến hoặc lùi một số nước xoay. Tiến thì app xoay và đọc từng nước.',
+      { count: { type: 'integer', description: 'Số nước: dương là tiến, âm là lùi. Ví dụ 1, 3, -1.' } }, ['count']),
+    tool('guide_goto', 'Chế độ hướng dẫn: nhảy thẳng tới đầu một bước bài học (và một việc trong bước đó nếu cần), khối được đặt đúng trạng thái tại đó.',
+      { step: { type: 'integer', description: 'Số thứ tự bước bài học, từ 1 đến 8.' },
+        task: { type: 'integer', description: 'Số thứ tự việc trong bước, bắt đầu từ 1. Bỏ trống là việc đầu tiên.' } }, ['step']),
+    tool('guide_autoplay', 'Chế độ hướng dẫn: bật hoặc dừng tự chạy lần lượt các nước.',
+      { on: { type: 'boolean', description: 'true là tự chạy, false là dừng.' } }, ['on']),
+    tool('set_explain_style', 'Đổi cách Claude soạn lời giải thích cho từng bước và từng việc trong chế độ hướng dẫn. App nhớ cho các lần sau và soạn lại lời giải thích hiện tại.',
+      { style: { type: 'string', description: 'Lời dặn về cách giải thích, viết thành câu đầy đủ, ví dụ: "Giải thích thật ngắn, mỗi việc một câu." Chuỗi rỗng để quay về cách mặc định.' } }, ['style']),
+    tool('set_voice', 'Bật hoặc tắt giọng đọc của app.',
+      { on: { type: 'boolean', description: 'true là bật, false là tắt.' } }, ['on'])
+  ];
+
+  /* o = {messages (mảng lịch sử, được nối thêm), onTool(name, input) -> Promise<chuỗi>}  ->  Promise<câu trả lời> */
+  function chat(o) {
+    var keep = o.messages.length - 1; // nếu hỏng giữa chừng thì bỏ lượt này khỏi lịch sử
+    return client().then(function (c) {
+      var rounds = 0;
+      function turn() {
+        return c.beta.messages.create({
+          model: MODEL,
+          max_tokens: 16000,
+          betas: ['server-side-fallback-2026-07-01'],
+          fallbacks: 'default',
+          output_config: { effort: 'low' },
+          system: CHAT_SYSTEM,
+          tools: TOOLS,
+          messages: o.messages
+        }).then(function (msg) {
+          if (msg.stop_reason === 'refusal') throw friendly('Claude từ chối trả lời yêu cầu này.');
+          // giữ nguyên toàn bộ nội dung (kể cả phần suy nghĩ) để gửi lại ở lượt sau
+          o.messages.push({ role: 'assistant', content: msg.content });
+          var uses = msg.content.filter(function (b) { return b.type === 'tool_use'; });
+          if (msg.stop_reason === 'tool_use' && uses.length) {
+            if (++rounds > 8) throw friendly('Claude gọi quá nhiều lệnh liên tiếp nên app đã dừng lại.');
+            var results = [];
+            return uses.reduce(function (p, u) {
+              return p.then(function () {
+                return Promise.resolve().then(function () { return o.onTool(u.name, u.input || {}); }).then(function (text) {
+                  results.push({ type: 'tool_result', tool_use_id: u.id, content: String(text) });
+                }, function (e) {
+                  results.push({ type: 'tool_result', tool_use_id: u.id, content: String(e && e.message || e), is_error: true });
+                });
+              });
+            }, Promise.resolve()).then(function () {
+              o.messages.push({ role: 'user', content: results });
+              return turn();
+            });
+          }
+          var text = '';
+          msg.content.forEach(function (b) { if (b.type === 'text') text += b.text; });
+          return text.trim() || 'Xong rồi.';
+        });
+      }
+      return turn();
+    }).catch(function (e) {
+      o.messages.length = Math.max(0, keep);
+      throw e;
     });
   }
 
@@ -222,6 +322,6 @@
   }
 
   window.AI = {
-    hasKey: hasKey, explain: explain, explainError: explainError, renderSettings: renderSettings, model: MODEL
+    hasKey: hasKey, explain: explain, chat: chat, getStyle: getStyle, setStyle: setStyle, explainError: explainError, renderSettings: renderSettings, model: MODEL
   };
 })();

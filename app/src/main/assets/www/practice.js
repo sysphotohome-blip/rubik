@@ -72,6 +72,83 @@
     app.appendChild(bar);
     app.appendChild(main);
 
+    /* ----- Trò chuyện với trợ lý Claude: Claude gọi các lệnh trong ctl để điều khiển màn hình ----- */
+    var ctl = null; // các lệnh của chế độ đang hiện (khối / hướng dẫn)
+    function waitFor(cond, ms) {
+      return new Promise(function (res) {
+        var t0 = Date.now();
+        (function tick() {
+          if (stopped || !h.alive() || cond() || Date.now() - t0 > ms) res(); else setTimeout(tick, 60);
+        })();
+      });
+    }
+    function onTool(name, inp) {
+      inp = inp || {};
+      if (stopped || !h.alive()) throw new Error('Người dùng đã rời màn hình này.');
+      if (name === 'set_explain_style') {
+        window.AI.setStyle(String(inp.style || '').trim());
+        if (ctl.restyle) ctl.restyle();
+        return 'Đã lưu cách giải thích mới.' + (ctl.restyle ? ' App đang soạn lại lời giải thích cho khối này.' : ' Sẽ áp dụng khi mở hướng dẫn.');
+      }
+      if (name === 'set_voice') {
+        if (inp.on && window.Speech.problem()) throw new Error(window.Speech.problem());
+        window.Speech.setOn(!!inp.on);
+        if (h.paintVoice) h.paintVoice();
+        return inp.on ? 'Đã bật giọng đọc.' : 'Đã tắt giọng đọc.';
+      }
+      if (!ctl[name]) {
+        throw new Error(ctl.mode === 'cube' ? 'Lệnh này chỉ dùng trong chế độ hướng dẫn. Hiện đang ở chế độ khối: gọi start_guide trước.'
+          : 'Lệnh này chỉ dùng trong chế độ khối. Hiện đang ở chế độ hướng dẫn: gọi back_to_cube trước.');
+      }
+      return ctl[name](inp);
+    }
+    if (window.AI.hasKey()) {
+      main.classList.add('has-dock');
+      var dock = el('form', 'chat-dock');
+      var bubble = el('div', 'chat-bubble');
+      bubble.hidden = true;
+      var asked = el('div', 'chat-asked'), answer = el('div', 'chat-answer');
+      var shut = el('button', 'chat-close', '×');
+      shut.type = 'button';
+      shut.setAttribute('aria-label', 'Đóng câu trả lời');
+      shut.onclick = function () { bubble.hidden = true; };
+      bubble.appendChild(shut); bubble.appendChild(asked); bubble.appendChild(answer);
+      var row = el('div', 'chat-row');
+      var box = el('input');
+      box.type = 'text';
+      box.autocomplete = 'off';
+      box.placeholder = 'Nói với Claude: “xáo trộn đi”, “tới bước 3”…';
+      box.setAttribute('aria-label', 'Nói với trợ lý Claude');
+      var send = el('button', 'chat-send', 'Gửi');
+      send.type = 'submit';
+      row.appendChild(box); row.appendChild(send);
+      dock.appendChild(bubble); dock.appendChild(row);
+      app.appendChild(dock);
+      var sending = false;
+      dock.onsubmit = function (e) {
+        e.preventDefault();
+        var text = box.value.trim();
+        if (sending || !text) return;
+        sending = true; send.disabled = true;
+        box.value = '';
+        box.blur(); // hạ bàn phím để nhìn thấy khối
+        if (!P.chat || P.chat.length > 30) P.chat = []; // lịch sử dài quá thì bắt đầu lại
+        P.chat.push({ role: 'user', content: '[Trạng thái app] ' + ctl.status() + '\n\n[Người dùng nói] ' + text });
+        bubble.hidden = false;
+        asked.textContent = text;
+        answer.className = 'chat-answer busy';
+        answer.textContent = 'Claude đang làm…';
+        window.AI.chat({ messages: P.chat, onTool: onTool }).then(function (reply) {
+          answer.className = 'chat-answer';
+          answer.textContent = reply;
+          if (!stopped && h.alive() && window.Speech.isOn() && !window.Speech.problem()) window.Speech.say([reply]);
+        }, function (e) {
+          answer.className = 'chat-answer err';
+          answer.textContent = window.AI.explainError(e);
+        }).then(function () { sending = false; send.disabled = false; });
+      };
+    }
+
     if (P.guide) renderGuide(); else renderCube();
     return function () { stopped = true; };
 
@@ -209,6 +286,40 @@
       cv.addEventListener('pointerup', function () { drag = null; });
       cv.addEventListener('pointercancel', function () { drag = null; });
 
+      function idle() { return !busy && !queue.length; }
+      function cubeStatus() {
+        return 'Chế độ khối. ' + (C.isSolved(P.state) ? 'Khối đang ở trạng thái đã giải xong.'
+          : 'Khối đang rối. Các nước đã xoay tính từ khối đã giải: ' + P.hist.join(' ') + '.');
+      }
+      ctl = {
+        mode: 'cube',
+        status: cubeStatus,
+        turn_faces: function (inp) {
+          var toks = String(inp.moves || '').replace(/[′’]/g, "'").trim().split(/\s+/).filter(Boolean);
+          if (!toks.length || toks.length > 40) throw new Error('Cần từ 1 đến 40 nước xoay.');
+          toks.forEach(function (t) { if (!/^[RLUDFB](2|')?$/.test(t)) throw new Error('Nước xoay không hợp lệ: ' + t + '. Chỉ dùng R L U D F B, có thể kèm dấu nháy hoặc số 2.'); });
+          return waitFor(idle, 20000).then(function () {
+            toks.forEach(function (t) { push(t, false); });
+            return waitFor(idle, 30000);
+          }).then(function () { return 'Đã xoay ' + toks.join(' ') + '. ' + ctl.status(); });
+        },
+        scramble: function () {
+          return waitFor(idle, 20000).then(function () { scramble(); return waitFor(idle, 30000); })
+            .then(function () { return 'Đã xáo trộn. ' + ctl.status(); });
+        },
+        reset_cube: function () {
+          return waitFor(idle, 20000).then(function () { bReset.onclick(); return 'Đã đặt lại. ' + ctl.status(); });
+        },
+        start_guide: function () {
+          return waitFor(idle, 20000).then(function () {
+            if (C.isSolved(P.state)) throw new Error('Khối đang ở trạng thái đã giải xong, chưa có gì để hướng dẫn. Hãy xáo trộn trước.');
+            bGo.onclick();
+            if (!P.guide) throw new Error('App chưa tìm được lời giải cho trạng thái này.');
+            return 'Đã mở hướng dẫn. ' + ctl.status();
+          });
+        }
+      };
+
       draw(); update();
       if (autoScramble) scramble();
     }
@@ -253,7 +364,7 @@
           speak: 'Bước ' + (n + 1) + '. ' + title + '. Mục tiêu: ' + g.goal + ' ' + g.why
         });
         skipped = [];
-        var meta = { id: st.id, no: n + 1, title: title, guide: g, group: groups[gi], html: groups[gi].html, segs: [] };
+        var meta = { id: st.id, no: n + 1, title: title, guide: g, group: groups[gi], html: groups[gi].html, speak: groups[gi].speak, segs: [] };
         st.segs.forEach(function (s, k) {
           var seg = { note: s.note, alg: s.alg, group: gi, tag: 'Việc ' + (k + 1) + '/' + st.segs.length, orig: s.note };
           segs.push(seg);
@@ -289,10 +400,12 @@
         aiStatus.innerHTML = html;
       }
       function here() { return !stopped && h.alive() && P.guide === G; }
+      var aiRun = 0; // mỗi lần soạn lại thì bỏ lượt soạn cũ
       function runAi() {
+        var my = ++aiRun;
         var todo = metas.filter(function (m) { return !G.ai[m.id]; });
         function next() {
-          if (!here()) return;
+          if (!here() || my !== aiRun) return;
           var m = todo.shift();
           if (!m) { setStatus('<b>Claude</b> đã soạn xong lời giải thích riêng cho khối này.', 'ok'); return; }
           setStatus('<b>Claude</b> đang soạn lời giải thích cho bước ' + m.no + '… Bạn cứ bắt đầu, lời mới sẽ tự hiện ra.', 'busy');
@@ -300,13 +413,13 @@
             no: m.no, title: m.title, goal: m.guide.goal, why: m.guide.why,
             tasks: m.segs.map(function (s) { return { note: window.Speech.plain(s.orig), alg: s.alg }; })
           }).then(function (d) {
+            if (!here() || my !== aiRun) return;
             G.ai[m.id] = d;
-            if (!here()) return;
             applyAi(m, d);
             playerEl.refreshText();
             next();
           }, function (e) {
-            if (!here()) return;
+            if (!here() || my !== aiRun) return;
             setStatus(window.AI.explainError(e) + ' App đang dùng lời giải thích có sẵn. ', 'err');
             var retry = el('button', 'link-btn', 'Thử lại');
             retry.type = 'button';
@@ -344,6 +457,61 @@
       };
       nav.appendChild(b1); nav.appendChild(b2);
       main.appendChild(nav);
+
+      var pc = playerEl.ctl;
+      function calm() { pc.pause(); return waitFor(function () { return !pc.info().busy; }, 5000); }
+      function guideStatus() {
+        var i = pc.info();
+        var all = metas.map(function (m) { return 'bước ' + m.no + ' ' + m.title + ' (' + m.segs.length + ' việc)'; }).join('; ');
+        var s = 'Chế độ hướng dẫn. Lời giải có ' + i.total + ' nước, gồm: ' + all + '. Bước nào không có trong danh sách là đã đúng sẵn nên được bỏ qua. ';
+        if (i.idx >= i.total) s += 'Đã chạy hết, khối đã giải xong.';
+        else {
+          var seg = segs[i.seg], m = metas[seg.group];
+          s += 'Đã xoay ' + i.idx + ' nước. Đang ở bước ' + m.no + '/8 (' + m.title + '), việc ' + (m.segs.indexOf(seg) + 1) + '/' + m.segs.length +
+            ': ' + window.Speech.plain(seg.orig) + ' Các nước của việc này: ' + seg.alg + '.' + (i.playing ? ' App đang tự chạy.' : '');
+        }
+        if (window.AI.getStyle()) s += ' Cách giải thích người dùng đã dặn: ' + window.AI.getStyle();
+        return s;
+      }
+      ctl = {
+        mode: 'guide',
+        status: guideStatus,
+        back_to_cube: function () {
+          return calm().then(function () { b1.onclick(); return 'Đã về chế độ khối. ' + ctl.status(); });
+        },
+        guide_step: function (inp) {
+          var n = parseInt(inp.count, 10);
+          if (!n) throw new Error('count phải là số nguyên khác 0.');
+          return calm().then(function () {
+            var i = pc.info();
+            if (n < 0 || n > 12) { pc.seek(i.idx + n); return null; } // lùi hoặc đi xa thì nhảy thẳng
+            return Promise.race([new Promise(function (res) { pc.step(n, res); }), waitFor(function () { return false; }, 120000)]);
+          }).then(function () { return ctl.status(); });
+        },
+        guide_goto: function (inp) {
+          var m = null, k = Math.max(1, parseInt(inp.task, 10) || 1);
+          metas.forEach(function (x) { if (x.no === parseInt(inp.step, 10)) m = x; });
+          if (!m) throw new Error('Bước ' + inp.step + ' không có trong lời giải này (đã đúng sẵn hoặc số bước không hợp lệ).');
+          if (k > m.segs.length) throw new Error('Bước ' + m.no + ' chỉ có ' + m.segs.length + ' việc.');
+          return calm().then(function () {
+            pc.seek(pc.segIndex(segs.indexOf(m.segs[k - 1])));
+            return ctl.status();
+          });
+        },
+        guide_autoplay: function (inp) {
+          if (inp.on) pc.play(); else pc.pause();
+          return inp.on ? 'App đang tự chạy các nước.' : 'Đã dừng tự chạy. ' + ctl.status();
+        },
+        restyle: function () { // soạn lại lời giải thích theo cách mới
+          G.ai = {};
+          metas.forEach(function (m) {
+            m.group.html = m.html; m.group.speak = m.speak;
+            m.segs.forEach(function (seg) { seg.note = seg.orig; delete seg.say; });
+          });
+          playerEl.refreshText();
+          runAi();
+        }
+      };
     }
   }
 
