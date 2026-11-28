@@ -9,6 +9,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
+import android.view.WindowManager;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -130,6 +131,8 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Người học vừa nhìn hình vừa xoay khối thật, không chạm màn hình: đừng để máy tự tắt màn hình khi app đang mở
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(getColor(R.color.app_bg));
@@ -246,11 +249,15 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (web.canGoBack()) {
-            web.goBack();
-        } else {
-            super.onBackPressed();
-        }
+        // Hỏi trang trước: nếu khối đang phóng toàn màn hình thì chỉ thu nhỏ lại
+        web.evaluateJavascript("!!(window.appBack&&window.appBack())", handled -> {
+            if ("true".equals(handled)) return;
+            if (web.canGoBack()) {
+                web.goBack();
+            } else {
+                super.onBackPressed();
+            }
+        });
     }
 
     @Override

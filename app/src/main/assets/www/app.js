@@ -18,7 +18,9 @@
     stop: '<svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>',
     cube: '<svg viewBox="0 0 24 24"><path d="M12 2.500l8.500 4.750v9.500L12 21.500l-8.500-4.750v-9.500z" fill="none" stroke="currentColor" stroke-width="1.800" stroke-linejoin="round"/><path d="M3.500 7.250L12 12l8.500-4.750M12 12v9.500" fill="none" stroke="currentColor" stroke-width="1.800" stroke-linejoin="round"/></svg>',
     spark: '<svg viewBox="0 0 24 24"><path d="M12 2.500l2.200 6.300 6.300 2.200-6.300 2.200L12 19.500l-2.200-6.300L3.500 11l6.300-2.200zM19 16l.900 2.100L22 19l-2.100.900L19 22l-.900-2.100L16 19l2.100-.900z"/></svg>',
-    flip: '<svg viewBox="0 0 24 24"><path d="M12 3l4 5h-3v8h3l-4 5-4-5h3V8H8z"/></svg>'
+    flip: '<svg viewBox="0 0 24 24"><path d="M12 3l4 5h-3v8h3l-4 5-4-5h3V8H8z"/></svg>',
+    full: '<svg viewBox="0 0 24 24"><path d="M4 4h6v2H6v4H4zM14 4h6v6h-2V6h-4zM4 14h2v4h4v2H4zM18 14h2v6h-6v-2h4z"/></svg>',
+    shrink: '<svg viewBox="0 0 24 24"><path d="M8 4h2v6H4V8h4zM14 4h2v4h4v2h-6zM4 14h6v6H8v-4H4zM14 14h6v2h-4v4h-2z"/></svg>'
   };
 
   function el(tag, cls, html) {
@@ -43,6 +45,39 @@
   function bigSize() {
     return Math.round(Math.max(220, Math.min(window.innerWidth, 560, window.innerHeight * 0.62)));
   }
+
+  /* Nút phóng khối ra toàn màn hình. card: thẻ chứa hình và nút bấm; setSize(n) đổi cỡ hình rồi vẽ lại */
+  var exitFull = null;
+  function fullButton(card, stage, normalSize, setSize) {
+    var b = el('button', 'flip full-btn', ICON.full);
+    b.type = 'button';
+    var on = false;
+    function fit() {
+      if (!on) return;
+      setSize(Math.max(160, Math.floor(Math.min(stage.clientWidth, stage.clientHeight))));
+    }
+    function set(v) {
+      on = v;
+      card.classList.toggle('full', on);
+      document.documentElement.classList.toggle('no-scroll', on);
+      b.innerHTML = on ? ICON.shrink : ICON.full;
+      b.setAttribute('aria-label', on ? 'Thu nhỏ khối' : 'Phóng khối ra toàn màn hình');
+      if (on) { exitFull = function () { set(false); }; fit(); }
+      else { if (exitFull) exitFull = null; setSize(normalSize); }
+    }
+    b.onclick = function () { set(!on); };
+    b.setAttribute('aria-label', 'Phóng khối ra toàn màn hình');
+    window.addEventListener('resize', fit);
+    stage.appendChild(b);
+    return b;
+  }
+  // Nút Back của máy (hoặc phím Esc): đang toàn màn hình thì thu nhỏ lại trước. Trả về true nếu đã xử lý.
+  window.appBack = function () {
+    if (!exitFull) return false;
+    exitFull();
+    return true;
+  };
+  window.addEventListener('keydown', function (e) { if (e.key === 'Escape') window.appBack(); });
 
   function ease(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
 
@@ -140,6 +175,11 @@
     flip.setAttribute('aria-label', 'Đổi góc nhìn trên/dưới');
     stage.appendChild(flip);
     stage.appendChild(voiceButton());
+    fullButton(wrap, stage, size, function (n) {
+      size = n;
+      cv.style.width = cv.style.height = n + 'px';
+      draw();
+    });
     wrap.appendChild(stage);
 
     // demo.segments = [{note, alg}]: công thức chia thành từng việc, mỗi việc có lời ghi chú riêng
@@ -560,12 +600,13 @@
   function route() {
     var myGen = ++gen;
     var id = location.hash.replace(/^#\/?/, '');
+    window.appBack(); // rời trang thì thoát toàn màn hình
     if (cleanup) { cleanup(); cleanup = null; }
     Sp.stop();
     app.innerHTML = '';
     var idx = -1;
     STEPS.forEach(function (s, i) { if (s.id === id) idx = i; });
-    if (id === 'khoi-3d') cleanup = window.Practice.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen, listenButton: listenButton, bigSize: bigSize, paintVoice: paintVoice, alive: function () { return myGen === gen; } });
+    if (id === 'khoi-3d') cleanup = window.Practice.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen, listenButton: listenButton, bigSize: bigSize, paintVoice: paintVoice, fullButton: fullButton, alive: function () { return myGen === gen; } });
     else if (id === 'giai') cleanup =window.Scan.render(app, { el: el, icons: ICON, goHome: goHome, player: player, gen: myGen, listenButton: listenButton });
     else if (id === 'tro-ly') window.AI.renderSettings(app, { el: el, icons: ICON, goHome: goHome, alive: function () { return myGen === gen; } });
     else if (idx >= 0) renderStep(idx, myGen); else renderHome();

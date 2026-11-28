@@ -154,6 +154,7 @@
 
     /* ----- Khối 3D: tự xoay, tự xáo trộn ----- */
     function renderCube(autoScramble) {
+      window.appBack(); // đổi chế độ thì thoát toàn màn hình
       main.innerHTML = '';
       main.appendChild(el('h1', null, 'Xáo trộn khối'));
       main.appendChild(el('p', null, 'Bấm các nút bên dưới để tự xoay từng mặt, hoặc để app xáo trộn ngẫu nhiên. ' +
@@ -173,6 +174,11 @@
 
       var yaw = -32, pitch = 26, turn = null, busy = false, queue = [];
       function draw() { C.drawCube(cv, P.state, { size: size, yaw: yaw, pitch: pitch, turn: turn }); }
+      h.fullButton(card, stage, size, function (n) {
+        size = n;
+        cv.style.width = cv.style.height = n + 'px';
+        draw();
+      });
 
       var pad = el('div', 'pad');
       ['', "'"].forEach(function (suf) {
@@ -326,6 +332,7 @@
 
     /* ----- Hướng dẫn giải từng nước ----- */
     function renderGuide() {
+      window.appBack(); // đổi chế độ thì thoát toàn màn hình
       main.innerHTML = '';
       var G = P.guide, lbl = G.lbl;
       main.appendChild(el('h1', null, 'Hướng dẫn giải từng nước'));

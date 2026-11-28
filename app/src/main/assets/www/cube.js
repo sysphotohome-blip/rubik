@@ -201,8 +201,14 @@
     var yaw = (o.yaw == null ? -32 : o.yaw) * Math.PI / 180;
     var pitch = (o.pitch == null ? 26 : o.pitch) * Math.PI / 180;
     var cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
-    var scale = Math.min(w, h) / 5.5, ox = w / 2, oy = h / 2;
+    var scale = Math.min(w, h) / 5.6, ox = w / 2, oy = h / 2;
     var turn = o.turn;
+    // Vẽ theo phối cảnh (phần gần mắt to hơn phần xa): nếu vẽ song song, mắt dễ "lật" khối thành cái hốc lõm
+    var CAM = 10; // khoảng cách từ mắt tới tâm khối, tính theo cạnh một viên
+    function proj(q) {
+      var f = CAM / (CAM - q[2]);
+      return [ox + q[0] * scale * f, oy - q[1] * scale * f];
+    }
 
     function view(p) {
       var x = p[0] * cy + p[2] * sy, z = -p[0] * sy + p[2] * cy, y = p[1];
@@ -213,9 +219,26 @@
 
     var items = state.map(function (c) {
       var moving = inTurn(c);
-      return { c: c, moving: moving, depth: view(tr(c.pos, moving))[2] };
+      var q = view(tr(c.pos, moving));
+      // viên xa mắt vẽ trước
+      return { c: c, moving: moving, depth: -(q[0] * q[0] + q[1] * q[1] + (CAM - q[2]) * (CAM - q[2])) };
     });
     items.sort(function (a, b) { return a.depth - b.depth; });
+
+    // Bóng đổ dưới chân khối (khi nhìn từ trên xuống) giúp mắt thấy rõ đây là khối đặc đang nổi lên
+    if (pitch > 0.14) {
+      [[1.95, 0.07], [1.6, 0.07], [1.25, 0.08]].forEach(function (ring) {
+        ctx.beginPath();
+        for (var a = 0; a < 32; a++) {
+          var t = a / 32 * Math.PI * 2;
+          var g = proj(view([Math.cos(t) * ring[0], -1.75, Math.sin(t) * ring[0]]));
+          if (a) ctx.lineTo(g[0], g[1]); else ctx.moveTo(g[0], g[1]);
+        }
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(0,0,0,' + ring[1] + ')';
+        ctx.fill();
+      });
+    }
 
     ctx.lineJoin = 'round';
     function poly(center, u, v, half, moving) {
@@ -227,9 +250,8 @@
           center[1] + (u[1] * sg[i][0] + v[1] * sg[i][1]) * half,
           center[2] + (u[2] * sg[i][0] + v[2] * sg[i][1]) * half
         ];
-        var q = view(tr(p, moving));
-        var sx = ox + q[0] * scale, syy = oy - q[1] * scale;
-        if (i) ctx.lineTo(sx, syy); else ctx.moveTo(sx, syy);
+        var q = proj(view(tr(p, moving)));
+        if (i) ctx.lineTo(q[0], q[1]); else ctx.moveTo(q[0], q[1]);
       }
       ctx.closePath();
     }
@@ -239,10 +261,12 @@
       for (var d = 0; d < 6; d++) {
         var n = DIRS[d];
         var nv = view(tr(n, it.moving));
-        if (nv[2] <= 0.02) continue;
         var ax = n[0] ? 0 : (n[1] ? 1 : 2);
         var u = AXES[(ax + 1) % 3], v = AXES[(ax + 2) % 3];
         var center = [c.pos[0] + n[0] * 0.5, c.pos[1] + n[1] * 0.5, c.pos[2] + n[2] * 0.5];
+        var cv = view(tr(center, it.moving));
+        // mặt quay lưng về phía mắt thì bỏ qua
+        if (-nv[0] * cv[0] - nv[1] * cv[1] + nv[2] * (CAM - cv[2]) <= 0.02) continue;
         poly(center, u, v, 0.5, it.moving);
         ctx.fillStyle = BODY; ctx.strokeStyle = BODY; ctx.lineWidth = 1;
         ctx.fill(); ctx.stroke();
@@ -251,7 +275,7 @@
         if (!col) continue;
         // đổ bóng nhẹ theo hướng mặt
         var light = Math.max(0, nv[0] * -0.25 + nv[1] * 0.55 + nv[2] * 0.8);
-        var shaded = shade((o.colors && o.colors[col]) || COLORS[col] || COLORS.X, 1 - 0.26 * (1 - light));
+        var shaded = shade((o.colors && o.colors[col]) || COLORS[col] || COLORS.X, 1 - 0.3 * (1 - light));
         poly(center, u, v, 0.36, it.moving);
         ctx.fillStyle = shaded; ctx.strokeStyle = shaded;
         ctx.lineWidth = scale * 0.12;
