@@ -194,6 +194,53 @@
         { type: 'tip', html: 'Luôn làm <b>trọn bộ 4 nước</b> (kết thúc bằng D) trước khi xoay U. Dừng giữa chừng là hỏng.' },
         { type: 'p', html: 'Cuối cùng xoay <b>U</b> để tầng trên khớp với các tầng dưới. Chúc mừng, bạn đã giải xong khối Rubik! 🎉' }
       ]
+    },
+    {
+      id: 'meo-nho', title: 'Mẹo nhớ công thức', short: 'Nhớ bằng tay, bằng nhịp và bằng hình', extra: true,
+      goal: { mask: 'all' },
+      blocks: [
+        { type: 'p', html: 'Cả cách giải này chỉ có <b>6 công thức</b>, và phần lớn được ghép từ cùng một bộ 4 nước. Bạn không cần học thuộc từng chữ cái như học một dãy số. Hãy nhớ bằng ba thứ: <b>tay</b> (xoay nhiều cho quen), <b>nhịp</b> (đọc thành từng cụm ngắn) và <b>hình</b> (thấy hình nào thì dùng công thức nào).' },
+
+        { type: 'h', text: '1. Học một bộ 4 nước trước đã' },
+        { type: 'formula', alg: SEXY, note: 'Đọc theo việc tay làm: “lên, đẩy, xuống, kéo”.' },
+        { type: 'p', html: 'Tay phải ôm mặt phải. <b>R</b> là đưa mặt phải <b>lên</b>, <b>U</b> là ngón trỏ phải <b>đẩy</b> tầng trên sang trái, <b>R′</b> là đưa mặt phải <b>xuống</b>, <b>U′</b> là ngón trỏ trái <b>kéo</b> tầng trên về. Hai nước sau chính là hai nước đầu làm ngược lại theo đúng thứ tự: lên rồi xuống, đẩy rồi kéo.' },
+        { type: 'demo', title: 'Tập cho quen tay: làm 6 lần', text: 'Bắt đầu từ khối đã giải xong. Làm đủ 6 lần thì khối trở lại như cũ. Nếu không trở lại, tức là có một nước bạn xoay sai.', mask: 'all', setup: '', alg: rep(SEXY, 6) },
+        { type: 'tip', html: 'Mỗi ngày làm bài tập “6 lần” này vài lượt, không nhìn chữ. Sau hai ba ngày tay tự chạy, đầu không phải nghĩ nữa. Đó là lúc bạn đã thuộc hơn nửa số công thức của cả bài.' },
+
+        { type: 'h', text: '2. Các công thức khác là bộ 4 nước ấy mặc thêm áo' },
+        { type: 'formula', alg: OLL, note: 'Chữ thập vàng = F + (lên, đẩy, xuống, kéo) + F′' },
+        { type: 'p', html: 'Mở cửa trước (<b>F</b>), làm bộ 4 nước, đóng cửa trước lại (<b>F′</b>). Nhớ thành câu: <b>“mở cửa, làm việc, đóng cửa”</b>. Quên đóng cửa là tầng dưới hỏng.' },
+        { type: 'demo', title: 'Mở cửa, làm việc, đóng cửa', mask: 'yellowCross', alg: OLL },
+        { type: 'formula', alg: TW, note: 'Xoay góc vàng = vẫn nhịp 4 nước, nhưng làm với tầng đáy' },
+        { type: 'p', html: 'Vẫn là mặt phải và một tầng nằm ngang, chỉ khác là dùng tầng <b>đáy</b> thay cho tầng trên, và bắt đầu bằng <b>xuống</b>: “xuống, đáy, lên, đáy”. Mặt phải xuống rồi lên, tầng đáy đi rồi về. Bộ này cũng làm 6 lần thì khối trở lại như cũ, nên bạn tập giống hệt bài tập ở mục 1.' },
+        { type: 'demo', title: 'Xuống, đáy, lên, đáy: làm 6 lần', mask: 'all', setup: '', alg: rep(TW, 6) },
+
+        { type: 'h', text: '3. Công thức dài: cắt làm đôi' },
+        { type: 'formula', alg: MID_R, note: 'Tầng hai, sang phải = (U R U′ R′) + (U′ F′ U F)' },
+        { type: 'p', html: 'Đừng nhớ 8 chữ. Hãy nhớ <b>2 cụm 4 nước</b>. Cụm đầu làm với <b>mặt phải</b>, cụm sau làm với <b>mặt trước</b>, và trong mỗi cụm các nước đi theo cặp “đi rồi về”: U rồi U′, R rồi R′.' },
+        { type: 'p', html: 'Nước đầu tiên là nước dễ quên nhất. Mẹo: <b>cạnh sắp sang bên nào thì trước hết đẩy nó ra xa bên đó</b>. Sang phải thì đẩy nó sang trái trước (U), sang trái thì đẩy nó sang phải trước (U′). Sau đó mặt bên phía đích đi lên đón nó.' },
+        { type: 'demo', title: 'Sang phải: cụm mặt phải, rồi cụm mặt trước', mask: 'layer1FR', alg: MID_R },
+        { type: 'formula', alg: MID_L, note: 'Sang trái: soi gương công thức trên' },
+        { type: 'p', html: 'Công thức sang trái <b>không cần học riêng</b>. Tay trái làm đúng việc tay phải vừa làm, như soi gương: chỗ nào là R thì thành L, và mọi chiều xoay đều đảo lại. Thuộc một bên là có luôn bên kia.' },
+
+        { type: 'h', text: '4. Hai công thức của tầng vàng: nhớ bằng nhịp' },
+        { type: 'formula', alg: SUNE, note: 'Khớp cạnh vàng: mặt phải “lên, xuống, lên, xuống”, xen giữa là U' },
+        { type: 'p', html: 'Mặt phải chỉ làm một việc: <b>lên, xuống, lên, xuống</b>. Sau mỗi lần mặt phải động thì tầng trên xoay một cái, <b>luôn cùng một chiều</b> (U, không bao giờ là U′). Riêng lần thứ ba xoay gấp đôi (U2). Đọc thành nhịp: <b>“lên U, xuống U, lên U-U, xuống U”</b>.' },
+        { type: 'demo', title: 'Lên U, xuống U, lên U-U, xuống U', mask: 'yellowEdges', alg: SUNE },
+        { type: 'formula', alg: NIK, note: 'Đặt góc vàng: phải lên, trái lên, phải xuống, trái xuống' },
+        { type: 'p', html: 'Tầng trên lắc qua lắc lại: <b>U, U′, U, U′</b>. Xen giữa, hai tay thay phiên nhau: <b>tay phải đưa lên, tay trái đưa lên, tay phải đưa xuống, tay trái đưa xuống</b>. Viết ra là U R, U′ L′, U R′, U′ L. Hai mặt bên cùng lên rồi cùng xuống nên cuối cùng hai tầng dưới trở về nguyên vẹn.' },
+        { type: 'demo', title: 'Phải lên, trái lên, phải xuống, trái xuống', mask: 'all', setup: inv(FINISH) + ' ' + inv(NIK), alg: NIK },
+
+        { type: 'h', text: '5. Nhớ “khi nào dùng” bằng hình, không bằng số thứ tự' },
+        { type: 'p', html: 'Người mới thường thuộc công thức nhưng quên <b>lúc nào dùng</b> và <b>cầm khối thế nào</b>. Hãy gắn mỗi công thức với một hình trên khối:' },
+        { type: 'p', html: '<b>Góc trắng nằm trên chỗ của nó</b> → lên, đẩy, xuống, kéo.<br><b>Vạch dọc ở mặt trước</b> (cạnh khớp tâm) → công thức tầng hai, đẩy cạnh ra xa trước.<br><b>Chấm, chữ L, vạch ngang màu vàng</b> → mở cửa, làm việc, đóng cửa.<br><b>Dấu cộng vàng, cạnh chưa khớp</b> → lên U, xuống U, lên U-U, xuống U.<br><b>Một góc đã đúng chỗ ở trước–phải</b> → phải lên, trái lên, phải xuống, trái xuống.<br><b>Góc vàng chưa ngửa ở trước–phải</b> → xuống, đáy, lên, đáy.' },
+        { type: 'tip', html: 'Gần như lúc nào cũng cầm viên đang cần xử lý ở vị trí <b>trước, phải, trên</b>. Chỉ cần nhớ một chỗ cầm ấy cho mọi bước có góc.' },
+
+        { type: 'h', text: '6. Cách tập để nhớ lâu' },
+        { type: 'p', html: '<b>Mỗi ngày một công thức.</b> Học dồn cả 6 cái trong một buổi thì hôm sau lẫn hết. Hôm nay bộ 4 nước, mai “mở cửa – đóng cửa”, cứ thế.<br><b>Đọc thành tiếng khi xoay.</b> Miệng đọc “lên, đẩy, xuống, kéo”, tay làm theo. Tai nghe thêm một lần nữa nên nhớ nhanh hơn chỉ nhìn.<br><b>Xoay chậm mà đều.</b> Sai một nước là phải làm lại từ đầu, nên chậm mà đúng luôn nhanh hơn.<br><b>Nhắm mắt làm lại.</b> Khi đã quen, thử nhắm mắt làm một công thức. Làm được tức là tay đã nhớ thay đầu.<br><b>Ôn cách quãng.</b> Tập 5 phút buổi sáng, 5 phút buổi tối, hôm sau ôn lại trước khi học cái mới. Nhiều lần ngắn tốt hơn một lần dài.' },
+        { type: 'warn', html: 'Đang làm dở công thức thì <b>đừng dừng lại nghĩ</b> và đừng xoay cả khối. Lỡ quên giữa chừng thì cứ làm lại bước đó từ đầu: các bước trước vẫn dễ dựng lại hơn là đoán mò nước tiếp theo.' },
+        { type: 'p', html: 'Muốn tập ngay? Vào <b>Khối 3D</b>, xáo trộn rồi bấm hướng dẫn giải: mỗi bước có bài giải thích đầy đủ, bạn vừa đọc nhịp vừa xoay theo trên khối thật.' }
+      ]
     }
   ];
 

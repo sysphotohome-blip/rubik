@@ -334,3 +334,8 @@ button.nav-btn.primary { color: var(--on-accent); }
 .player.full > .seg-note { display: block; flex: none; min-height: 0; max-height: 24vh; overflow-y: auto; }
 .player.full > .controls { display: flex; flex: none; }
 .player.full > .pad { display: grid; flex: none; }
+
+/* Bài viết đầy đủ của từng bước ở Khối 3D */
+.walk-long { margin-top: 14px; padding-top: 4px; border-top: 1px dashed var(--line); }
+.walk-long h4 { margin: 16px 0 4px; font-size: 15.5px; }
+.walk-long p { margin: 4px 0 0; line-height: 1.6; }

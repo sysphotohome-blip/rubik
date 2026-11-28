@@ -510,7 +510,7 @@
       a.onclick = function () { fromHome = true; };
       a.appendChild(cubeCanvas(build(s.goal), 68, s.goal));
       var t = el('div', 'step-text');
-      t.appendChild(el('div', 'step-num', i === 0 ? 'Mở đầu' : 'Bước ' + i));
+      t.appendChild(el('div', 'step-num', s.extra ? 'Bài thêm' : (i === 0 ? 'Mở đầu' : 'Bước ' + i)));
       t.appendChild(el('div', 'step-title', s.title));
       t.appendChild(el('div', 'muted', s.short));
       a.appendChild(t);
@@ -539,7 +539,7 @@
     back.onclick = goHome;
     back.setAttribute('aria-label', 'Về danh sách');
     bar.appendChild(back);
-    bar.appendChild(el('div', 'topbar-title', (i === 0 ? 'Mở đầu' : 'Bước ' + i + '/' + (STEPS.length - 1))));
+    bar.appendChild(el('div', 'topbar-title', (s.extra ? 'Bài thêm' : (i === 0 ? 'Mở đầu' : 'Bước ' + i + '/' + (STEPS.filter(function (x) { return !x.extra; }).length - 1)))));
     var parts = []; // các đoạn sẽ đọc khi bấm "Nghe"
     bar.appendChild(listenButton(function () { return parts; }));
     app.appendChild(bar);
@@ -588,7 +588,7 @@
     var p = el('a', 'nav-btn' + (i === 0 ? ' hidden' : ''), '‹ Bước trước');
     if (i > 0) { p.href = '#/' + STEPS[i - 1].id; p.onclick = goStep(STEPS[i - 1].id); }
     var last = i === STEPS.length - 1;
-    var n = el('a', 'nav-btn primary', last ? 'Về danh sách' : 'Bước tiếp ›');
+    var n = el('a', 'nav-btn primary', last ? 'Về danh sách' : (STEPS[i + 1].extra ? 'Mẹo nhớ ›' : 'Bước tiếp ›'));
     n.href = last ? '#/' : '#/' + STEPS[i + 1].id;
     n.onclick = last ? goHome : goStep(STEPS[i + 1].id);
     nav.appendChild(p); nav.appendChild(n);
